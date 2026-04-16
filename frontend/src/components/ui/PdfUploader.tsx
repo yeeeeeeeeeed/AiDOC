@@ -39,7 +39,15 @@ export default function PdfUploader({ onUploaded, multiple = false }: Props) {
               fileItem = drmRes.fileItem;
             }
           } catch {
-            // DRM 프록시 없으면 직접 업로드
+            // DRM 프록시 실패 시 — 파일이 DRM 암호화돼 있으면 직접 업로드 불가
+            const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+            const isPdf = header[0] === 0x25 && header[1] === 0x50; // %PDF
+            if (!isPdf) {
+              throw new Error(
+                "DRM 복호화 실패. axyard.poscoenc.com/aicp_elec/ 에 로그인하여 TCM 토큰을 발급받아 주세요."
+              );
+            }
+            // 일반 PDF면 직접 업로드 진행
           }
 
           const fd = new FormData();

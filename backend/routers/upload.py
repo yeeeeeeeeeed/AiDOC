@@ -81,9 +81,10 @@ async def upload_pdf(request: Request):
     with open(pdf_path, "wb") as f:
         f.write(pdf_bytes)
 
-    logger.info("pdf_bytes 크기: %d, 앞 4바이트: %s", len(pdf_bytes), pdf_bytes[:4])
+    if pdf_bytes[:2] == b"\x9b " or pdf_bytes[1:3] == b"DR":
+        raise HTTPException(400, "DRM 암호화된 파일입니다. axyard.poscoenc.com/aicp_elec/ 에 로그인 후 다시 시도해주세요.")
     if not pdf_bytes.startswith(b"%PDF"):
-        raise HTTPException(400, f"유효한 PDF 파일이 아닙니다. 앞 4바이트: {pdf_bytes[:4]}")
+        raise HTTPException(400, "유효한 PDF 파일이 아닙니다.")
     page_count = pdf_page_count(pdf_bytes)
 
     # 썸네일 생성
