@@ -42,8 +42,13 @@ async def upload_pdf(request: Request):
     pdf_bytes = None
     filename = "upload.pdf"
 
-    # DRM 복호화 파일 (DFS에서 읽기)
-    if fi_json:
+    # 직접 업로드 파일 우선 (DRM 암호화 우회)
+    if file:
+        pdf_bytes = await file.read()
+        filename = getattr(file, "filename", filename)
+
+    # 직접 업로드 없을 때만 DFS에서 읽기
+    if not pdf_bytes and fi_json:
         from utils.dfs import read_file as dfs_read_file, mark_as_failed
         full_path = ""
         try:
@@ -62,11 +67,6 @@ async def upload_pdf(request: Request):
                 try: mark_as_failed(full_path)
                 except Exception: pass
             raise HTTPException(400, "DFS 파일을 읽을 수 없습니다.")
-
-    # 직접 업로드
-    if not pdf_bytes and file:
-        pdf_bytes = await file.read()
-        filename = getattr(file, "filename", filename)
 
     if not pdf_bytes:
         raise HTTPException(400, "파일이 없습니다.")

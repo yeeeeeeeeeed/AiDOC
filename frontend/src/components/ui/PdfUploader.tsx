@@ -43,10 +43,9 @@ export default function PdfUploader({ onUploaded, multiple = false }: Props) {
           }
 
           const fd = new FormData();
+          fd.append("file", file);
           if (fileItem) {
             fd.append("fileItem", JSON.stringify(fileItem));
-          } else {
-            fd.append("file", file);
           }
 
           const result = await api.uploadForm<UploadResult>("/api/pdf/upload", fd);
