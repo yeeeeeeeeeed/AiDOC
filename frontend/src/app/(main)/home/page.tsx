@@ -57,7 +57,7 @@ export default function HomePage() {
   const goToFeature = (href: string) => {
     if (uploads.length === 0) return;
     const jobIds = uploads.map((u) => u.job_id).join(",");
-    router.push(`${BASE}${href}?jobs=${jobIds}`);
+    router.push(`${href}?jobs=${jobIds}`);
   };
 
   return (
