@@ -71,7 +71,7 @@ export default function Sidebar() {
       <nav style={{ flex: 1, padding: "12px 8px", overflowY: "auto" }}>
         {MENU.map((item) => {
           if (item.adminOnly && !access?.is_admin) return null;
-          const fullHref = `${BASE}${item.href}`;
+          const fullHref = item.href;
           const isActive = pathname === fullHref || pathname?.startsWith(fullHref + "/");
           return (
             <Link
