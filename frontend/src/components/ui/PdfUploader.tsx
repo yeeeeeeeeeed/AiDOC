@@ -53,13 +53,19 @@ export default function PdfUploader({ onUploaded, multiple = false }: Props) {
             const drmRes = await drmUpload(file);
             if (drmRes?.resultStatus === "Success" && drmRes?.fileItem) {
               fileItem = drmRes.fileItem;
+            } else if (!isPdf) {
+              // DRM 암호화 파일인데 DFS 응답이 Success가 아닌 경우
+              const msg = drmRes?.message || drmRes?.resultStatus || "알 수 없는 오류";
+              throw new Error(
+                `DRM 복호화에 실패했습니다 (${msg}). AiDoc에 다시 로그인한 후 업로드해 주세요.`
+              );
             }
           } catch (drmErr) {
-            // DRM 프록시 실패 시 — 파일이 DRM 암호화돼 있으면 직접 업로드 불가
+            // DRM 프록시 호출 자체 실패 시 — 파일이 DRM 암호화돼 있으면 직접 업로드 불가
             if (!isPdf) {
-              throw new Error(
-                "DRM 복호화에 실패했습니다. AiDoc에 다시 로그인한 후 업로드해 주세요."
-              );
+              throw drmErr instanceof Error
+                ? drmErr
+                : new Error("DRM 복호화에 실패했습니다. AiDoc에 다시 로그인한 후 업로드해 주세요.");
             }
             // 일반 PDF면 직접 업로드 진행 (DRM 프록시 오류 무시)
             void drmErr;
