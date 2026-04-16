@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import PdfUploader from "@/components/ui/PdfUploader";
-import PageSelector from "@/components/ui/PageSelector";
 import type { UploadResult } from "@/types";
-
-const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "/aidoc";
 
 const FEATURES = [
   {
@@ -40,7 +37,7 @@ const FEATURES = [
   {
     key: "translate",
     label: "번역",
-    desc: "외국어 PDF를 한국어로 번역하여 추출",
+    desc: "PDF를 원하는 언어로 번역하여 추출",
     href: "/translate",
     icon: "⇄",
   },

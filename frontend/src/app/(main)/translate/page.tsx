@@ -143,7 +143,7 @@ function TranslateInner() {
   return (
     <div>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>번역</h1>
-      <p className="text-muted mb-4">외국어 PDF를 한국어로 번역하여 추출합니다.</p>
+      <p className="text-muted mb-4">PDF 문서를 원하는 언어로 번역하여 추출합니다.</p>
 
       {!upload && (
         <div className="card">
