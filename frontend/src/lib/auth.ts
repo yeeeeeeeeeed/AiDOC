@@ -31,11 +31,7 @@ export async function createTcmToken(userId: string): Promise<string> {
     const res = await fetch(TCM_DEV_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemCode: "AXI",
-        userId,
-        userIp: "0.0.0.0",
-      }),
+      body: JSON.stringify({ usrId: userId, sysCd: "AXI" }),
     });
     const data = await res.json();
     // TCM 응답: { status: 200, data: "<JWT 토큰>" }
