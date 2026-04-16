@@ -13,9 +13,20 @@ const LANGUAGES = [
   { value: "auto", label: "자동 감지" },
   { value: "en", label: "영어" },
   { value: "ja", label: "일본어" },
-  { value: "zh", label: "중국어" },
+  { value: "zh-CN", label: "중국어 (간체, 중국 본토)" },
+  { value: "zh-TW", label: "중국어 (번체, 대만)" },
+  { value: "zh-HK", label: "중국어 (번체, 홍콩)" },
+  { value: "vi", label: "베트남어" },
+  { value: "th", label: "태국어" },
+  { value: "id", label: "인도네시아어" },
+  { value: "ms", label: "말레이어" },
+  { value: "tl", label: "필리핀어 (타갈로그)" },
+  { value: "km", label: "크메르어 (캄보디아)" },
+  { value: "my", label: "미얀마어" },
   { value: "de", label: "독일어" },
   { value: "fr", label: "프랑스어" },
+  { value: "es", label: "스페인어" },
+  { value: "ru", label: "러시아어" },
 ];
 
 export default function TranslatePage() {
@@ -202,7 +213,7 @@ function TranslateInner() {
             .map((k) => (
               <div key={k} style={{ marginBottom: 16 }}>
                 <div className="font-bold mb-2">페이지 {k}</div>
-                <MarkdownView content={translatePages[k]} />
+                <MarkdownView content={translatePages[k]} hideCopy />
               </div>
             ))}
         </div>
