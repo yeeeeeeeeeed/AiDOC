@@ -26,6 +26,8 @@ const TARGET_LANGUAGES = [
   { value: "de", label: "독일어" },
   { value: "fr", label: "프랑스어" },
   { value: "es", label: "스페인어" },
+  { value: "es-AR", label: "스페인어 (아르헨티나)" },
+  { value: "pl", label: "폴란드어" },
   { value: "ru", label: "러시아어" },
 ];
 
