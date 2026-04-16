@@ -33,21 +33,36 @@ export default function PdfUploader({ onUploaded, multiple = false }: Props) {
           let fileItem = null;
 
           // DRM 업로드 시도 (프록시 사용 가능 시)
+          const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+          const isPdf = header[0] === 0x25 && header[1] === 0x50; // %PDF
+
+          if (!isPdf) {
+            // DRM 암호화 파일 — TCM 토큰 유무 확인
+            const tcmToken = document.cookie
+              .split("; ")
+              .find((c) => c.startsWith("AXI-TCM-TOKEN="))
+              ?.split("=")[1];
+            if (!tcmToken) {
+              throw new Error(
+                "DRM 암호화된 파일입니다. AiDoc에 다시 로그인한 후 업로드해 주세요."
+              );
+            }
+          }
+
           try {
             const drmRes = await drmUpload(file);
             if (drmRes?.fileItem) {
               fileItem = drmRes.fileItem;
             }
-          } catch {
+          } catch (drmErr) {
             // DRM 프록시 실패 시 — 파일이 DRM 암호화돼 있으면 직접 업로드 불가
-            const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-            const isPdf = header[0] === 0x25 && header[1] === 0x50; // %PDF
             if (!isPdf) {
               throw new Error(
-                "DRM 복호화 실패. axyard.poscoenc.com/aicp_elec/ 에 로그인하여 TCM 토큰을 발급받아 주세요."
+                "DRM 복호화에 실패했습니다. AiDoc에 다시 로그인한 후 업로드해 주세요."
               );
             }
-            // 일반 PDF면 직접 업로드 진행
+            // 일반 PDF면 직접 업로드 진행 (DRM 프록시 오류 무시)
+            void drmErr;
           }
 
           const fd = new FormData();

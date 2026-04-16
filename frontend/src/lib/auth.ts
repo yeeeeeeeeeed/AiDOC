@@ -38,7 +38,8 @@ export async function createTcmToken(userId: string): Promise<string> {
       }),
     });
     const data = await res.json();
-    return data.accessToken || "";
+    // TCM 응답: { status: 200, data: "<JWT 토큰>" }
+    return data.data || data.accessToken || "";
   } catch {
     return "";
   }
