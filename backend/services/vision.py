@@ -27,7 +27,7 @@ def get_model() -> str:
     return os.getenv("AZURE_OPENAI_VISION_DEPLOYMENT_NAME", "")
 
 
-def call_vision(img_bytes: bytes, system_prompt: str, user_prompt: str, max_tokens: int = 16384) -> str:
+def call_vision(img_bytes: bytes, system_prompt: str, user_prompt: str, max_tokens: int = 16384, token_ctx: dict | None = None) -> str:
     """이미지 1장 + 프롬프트 → Vision API 호출 → 응답 텍스트 반환"""
     client = get_client()
     img_b64 = base64.b64encode(img_bytes).decode()
@@ -44,10 +44,13 @@ def call_vision(img_bytes: bytes, system_prompt: str, user_prompt: str, max_toke
         max_completion_tokens=max_tokens,
         temperature=0,
     )
+    if token_ctx is not None:
+        token_ctx["input_tokens"] = response.usage.prompt_tokens
+        token_ctx["output_tokens"] = response.usage.completion_tokens
     return response.choices[0].message.content.strip()
 
 
-def call_vision_multi(images: list[bytes], system_prompt: str, user_prompt: str, max_tokens: int = 16384) -> str:
+def call_vision_multi(images: list[bytes], system_prompt: str, user_prompt: str, max_tokens: int = 16384, token_ctx: dict | None = None) -> str:
     """여러 이미지 + 프롬프트 → Vision API 호출"""
     client = get_client()
     content = []
@@ -65,6 +68,9 @@ def call_vision_multi(images: list[bytes], system_prompt: str, user_prompt: str,
         max_completion_tokens=max_tokens,
         temperature=0,
     )
+    if token_ctx is not None:
+        token_ctx["input_tokens"] = response.usage.prompt_tokens
+        token_ctx["output_tokens"] = response.usage.completion_tokens
     return response.choices[0].message.content.strip()
 
 

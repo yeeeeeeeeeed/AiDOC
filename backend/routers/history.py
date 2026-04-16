@@ -230,3 +230,107 @@ async def remove_user(request: Request):
         users.remove(uid)
         _save_json_list(USERS_FILE, users)
     return {"ok": True}
+
+
+# ── 토큰 사용량 ──
+
+TOKEN_LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "Log")
+
+def _read_token_logs(date_from: str, date_to: str) -> list:
+    from datetime import timedelta
+    all_entries = []
+    current = datetime.strptime(date_from, "%Y-%m-%d")
+    end = datetime.strptime(date_to, "%Y-%m-%d")
+    while current <= end:
+        day_str = current.strftime("%Y-%m-%d")
+        log_file = os.path.join(TOKEN_LOG_DIR, f"tokens_{day_str}.jsonl")
+        if os.path.exists(log_file):
+            with open(log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            all_entries.append(json.loads(line))
+                        except Exception:
+                            pass
+        current += timedelta(days=1)
+    return all_entries
+
+
+@router.get("/tokens/summary")
+def get_token_summary(request: Request, year: str = ""):
+    if not is_admin(request):
+        raise HTTPException(403, "관리자만 접근할 수 있습니다.")
+
+    if not year:
+        year = datetime.now().strftime("%Y")
+
+    entries = _read_token_logs(f"{year}-01-01", f"{year}-12-31")
+
+    monthly: dict[str, dict] = {}
+    for e in entries:
+        month = e.get("timestamp", "")[:7]
+        if not month:
+            continue
+        if month not in monthly:
+            monthly[month] = {"month": month, "requests": 0, "input_tokens": 0, "output_tokens": 0, "users": set()}
+        monthly[month]["requests"] += 1
+        monthly[month]["input_tokens"] += e.get("input_tokens", 0)
+        monthly[month]["output_tokens"] += e.get("output_tokens", 0)
+        if e.get("user_id"):
+            monthly[month]["users"].add(e["user_id"])
+
+    result = []
+    for m in sorted(monthly.keys()):
+        d = monthly[m]
+        result.append({
+            "month": d["month"],
+            "requests": d["requests"],
+            "input_tokens": d["input_tokens"],
+            "output_tokens": d["output_tokens"],
+            "unique_users": len(d["users"]),
+        })
+    return {"year": year, "months": result}
+
+
+@router.get("/tokens/detail")
+def get_token_detail(
+    request: Request,
+    date_from: str = "",
+    date_to: str = "",
+    user_id: str = "",
+    menu: str = "",
+    page: int = 1,
+    size: int = 50,
+):
+    if not is_admin(request):
+        raise HTTPException(403, "관리자만 접근할 수 있습니다.")
+
+    if not date_from:
+        date_from = datetime.now().strftime("%Y-%m-%d")
+    if not date_to:
+        date_to = date_from
+
+    entries = _read_token_logs(date_from, date_to)
+
+    if user_id:
+        entries = [e for e in entries if e.get("user_id") == user_id]
+    if menu:
+        entries = [e for e in entries if e.get("menu") == menu]
+
+    entries.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+
+    total = len(entries)
+    total_input = sum(e.get("input_tokens", 0) for e in entries)
+    total_output = sum(e.get("output_tokens", 0) for e in entries)
+    start = (page - 1) * size
+    items = entries[start:start + size]
+
+    return {
+        "items": items,
+        "total": total,
+        "total_input_tokens": total_input,
+        "total_output_tokens": total_output,
+        "page": page,
+        "total_pages": max(1, (total + size - 1) // size),
+    }

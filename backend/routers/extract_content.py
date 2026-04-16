@@ -5,12 +5,13 @@ import asyncio
 import json
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from services.pdf import pdf_to_images
 from services.vision import call_vision
+from utils.token_logger import log_tokens
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -39,9 +40,14 @@ class ContentExtractRequest(BaseModel):
 
 
 @router.post("/start")
-def start_content_extract(req: ContentExtractRequest, background_tasks: BackgroundTasks):
+def start_content_extract(req: ContentExtractRequest, background_tasks: BackgroundTasks, request: Request):
     j = get_job(req.job_id)
     pages = req.pages if req.pages else list(range(1, j["page_count"] + 1))
+    user_id = request.cookies.get("AXI-USER-ID", "")
+    filename = j.get("filename", "")
+
+    from routers.history import log_action
+    log_action("내용추출", "start", f"{filename}, {len(pages)}페이지", request)
 
     j["content_status"] = "EXTRACTING"
     j["content_steps"] = [{"page": p, "status": "pending", "detail": ""} for p in pages]
@@ -49,14 +55,16 @@ def start_content_extract(req: ContentExtractRequest, background_tasks: Backgrou
     j["content_pages"] = {}
     j["content_error"] = None
 
-    background_tasks.add_task(_run_content_extract, req.job_id, pages, req.custom_prompt)
+    background_tasks.add_task(_run_content_extract, req.job_id, pages, req.custom_prompt, user_id)
     return {"status": "started", "pages": pages}
 
 
-def _run_content_extract(job_id: str, pages: list[int], custom_prompt: str | None):
+def _run_content_extract(job_id: str, pages: list[int], custom_prompt: str | None, user_id: str = ""):
     j = _jobs.get(job_id)
     if not j:
         return
+
+    filename = j.get("filename", "")
 
     try:
         pdf_path = j["pdf_path"]
@@ -79,8 +87,12 @@ def _run_content_extract(job_id: str, pages: list[int], custom_prompt: str | Non
                 if custom_prompt:
                     user_msg += f"\n\n추가 지시: {custom_prompt}"
 
-                result = call_vision(images[0], SYSTEM_PROMPT, user_msg)
+                token_ctx: dict = {}
+                result = call_vision(images[0], SYSTEM_PROMPT, user_msg, token_ctx=token_ctx)
                 content_pages[str(page_num)] = result
+
+                log_tokens(user_id, job_id, "내용추출", filename, page_num,
+                           token_ctx.get("input_tokens", 0), token_ctx.get("output_tokens", 0))
 
                 j["content_steps"][idx]["status"] = "done"
                 j["content_steps"][idx]["detail"] = f"{len(result)}자"

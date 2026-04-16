@@ -11,11 +11,11 @@ from pydantic import BaseModel
 
 from services.pdf import pdf_to_images
 from services.vision import call_vision, parse_tables_json
+from utils.token_logger import log_tokens
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# upload 라우터의 Job 저장소 참조
 from routers.upload import get_job, set_job, _jobs
 
 SYSTEM_PROMPT = """당신은 PDF 이미지에서 표 데이터를 정확하게 추출하는 전문 OCR 시스템입니다.
@@ -45,14 +45,19 @@ SYSTEM_PROMPT = """당신은 PDF 이미지에서 표 데이터를 정확하게 �
 
 class ExtractRequest(BaseModel):
     job_id: str
-    pages: List[int] = []       # 1-based, 빈 리스트면 전체
-    custom_prompt: Optional[str] = None  # 커스텀 지시
+    pages: List[int] = []
+    custom_prompt: Optional[str] = None
 
 
 @router.post("/start")
-def start_extract(req: ExtractRequest, background_tasks: BackgroundTasks):
+def start_extract(req: ExtractRequest, background_tasks: BackgroundTasks, request: Request):
     j = get_job(req.job_id)
     pages = req.pages if req.pages else list(range(1, j["page_count"] + 1))
+    user_id = request.cookies.get("AXI-USER-ID", "")
+    filename = j.get("filename", "")
+
+    from routers.history import log_action
+    log_action("표추출", "start", f"{filename}, {len(pages)}페이지", request)
 
     j["table_status"] = "EXTRACTING"
     j["table_steps"] = [{"page": p, "status": "pending", "detail": ""} for p in pages]
@@ -60,14 +65,16 @@ def start_extract(req: ExtractRequest, background_tasks: BackgroundTasks):
     j["tables"] = []
     j["table_error"] = None
 
-    background_tasks.add_task(_run_extract, req.job_id, pages, req.custom_prompt)
+    background_tasks.add_task(_run_extract, req.job_id, pages, req.custom_prompt, user_id)
     return {"status": "started", "pages": pages}
 
 
-def _run_extract(job_id: str, pages: list[int], custom_prompt: str | None):
+def _run_extract(job_id: str, pages: list[int], custom_prompt: str | None, user_id: str = ""):
     j = _jobs.get(job_id)
     if not j:
         return
+
+    filename = j.get("filename", "")
 
     try:
         pdf_path = j["pdf_path"]
@@ -90,11 +97,15 @@ def _run_extract(job_id: str, pages: list[int], custom_prompt: str | None):
                 if custom_prompt:
                     user_msg += f"\n\n추가 지시: {custom_prompt}"
 
-                content = call_vision(images[0], SYSTEM_PROMPT, user_msg)
+                token_ctx: dict = {}
+                content = call_vision(images[0], SYSTEM_PROMPT, user_msg, token_ctx=token_ctx)
                 tables = parse_tables_json(content)
                 for t in tables:
                     t["page"] = page_num
                 all_tables.extend(tables)
+
+                log_tokens(user_id, job_id, "표추출", filename, page_num,
+                           token_ctx.get("input_tokens", 0), token_ctx.get("output_tokens", 0))
 
                 j["table_steps"][idx]["status"] = "done"
                 j["table_steps"][idx]["detail"] = f"{len(tables)}개 표"

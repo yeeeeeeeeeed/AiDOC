@@ -1,16 +1,17 @@
-"""번역 라우터 — 외국어 PDF → 한국어 번역"""
+"""번역 라우터 — 양방향 PDF 번역"""
 
 import os
 import asyncio
 import json
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from services.pdf import pdf_to_images
 from services.vision import call_vision
+from utils.token_logger import log_tokens
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -22,7 +23,8 @@ LANG_NAMES = {
     "zh-CN": "중국어 간체", "zh-TW": "중국어 번체(대만)", "zh-HK": "중국어 번체(홍콩)",
     "vi": "베트남어", "th": "태국어", "id": "인도네시아어",
     "ms": "말레이어", "tl": "필리핀어(타갈로그)", "km": "크메르어", "my": "미얀마어",
-    "de": "독일어", "fr": "프랑스어", "es": "스페인어", "es-AR": "스페인어(아르헨티나)", "pl": "폴란드어", "ru": "러시아어",
+    "de": "독일어", "fr": "프랑스어", "es": "스페인어", "es-AR": "스페인어(아르헨티나)",
+    "pl": "폴란드어", "ru": "러시아어",
 }
 
 
@@ -48,9 +50,15 @@ class TranslateRequest(BaseModel):
 
 
 @router.post("/start")
-def start_translate(req: TranslateRequest, background_tasks: BackgroundTasks):
+def start_translate(req: TranslateRequest, background_tasks: BackgroundTasks, request: Request):
     j = get_job(req.job_id)
     pages = req.pages if req.pages else list(range(1, j["page_count"] + 1))
+    user_id = request.cookies.get("AXI-USER-ID", "")
+    filename = j.get("filename", "")
+    target_name = LANG_NAMES.get(req.target_lang, req.target_lang)
+
+    from routers.history import log_action
+    log_action("번역", "start", f"{filename}, {len(pages)}페이지 → {target_name}", request)
 
     j["translate_status"] = "TRANSLATING"
     j["translate_steps"] = [{"page": p, "status": "pending", "detail": ""} for p in pages]
@@ -58,14 +66,17 @@ def start_translate(req: TranslateRequest, background_tasks: BackgroundTasks):
     j["translate_pages"] = {}
     j["translate_error"] = None
 
-    background_tasks.add_task(_run_translate, req.job_id, pages, req.source_lang, req.target_lang, req.custom_prompt)
+    background_tasks.add_task(_run_translate, req.job_id, pages, req.source_lang, req.target_lang, req.custom_prompt, user_id)
     return {"status": "started", "pages": pages}
 
 
-def _run_translate(job_id: str, pages: list[int], source_lang: str, target_lang: str, custom_prompt: str | None):
+def _run_translate(job_id: str, pages: list[int], source_lang: str, target_lang: str,
+                   custom_prompt: str | None, user_id: str = ""):
     j = _jobs.get(job_id)
     if not j:
         return
+
+    filename = j.get("filename", "")
 
     try:
         pdf_path = j["pdf_path"]
@@ -90,8 +101,12 @@ def _run_translate(job_id: str, pages: list[int], source_lang: str, target_lang:
                 if custom_prompt:
                     user_msg += f"\n\n추가 지시: {custom_prompt}"
 
-                result = call_vision(images[0], build_system_prompt(target_lang), user_msg)
+                token_ctx: dict = {}
+                result = call_vision(images[0], build_system_prompt(target_lang), user_msg, token_ctx=token_ctx)
                 translate_pages[str(page_num)] = result
+
+                log_tokens(user_id, job_id, "번역", filename, page_num,
+                           token_ctx.get("input_tokens", 0), token_ctx.get("output_tokens", 0))
 
                 j["translate_steps"][idx]["status"] = "done"
                 j["translate_steps"][idx]["detail"] = f"{len(result)}자"

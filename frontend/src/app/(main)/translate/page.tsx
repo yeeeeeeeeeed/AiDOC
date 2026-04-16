@@ -7,7 +7,10 @@ import PageSelector from "@/components/ui/PageSelector";
 import ProgressStream from "@/components/ui/ProgressStream";
 import MarkdownView from "@/components/ui/MarkdownView";
 import api, { createSSEConnection, drmDownload } from "@/lib/api";
+import { saveSession, loadSession, clearSession, saveThumbs, loadThumbs } from "@/lib/session";
 import type { UploadResult, StreamEvent, FileItem, StepStatus } from "@/types";
+
+const SESSION_KEY = "translate";
 
 const TARGET_LANGUAGES = [
   { value: "ko", label: "한국어" },
@@ -71,15 +74,19 @@ function TranslateInner() {
 
   useEffect(() => {
     const jobs = searchParams.get("jobs");
-    if (jobs) {
-      const jobId = jobs.split(",")[0];
-      api.get<{ status: string; filename: string; page_count: number }>(`/api/pdf/jobs/${jobId}`)
-        .then((data) => {
-          setUpload({ job_id: jobId, filename: data.filename, page_count: data.page_count, thumbnails: [] });
-          setSelectedPages(Array.from({ length: data.page_count }, (_, i) => i + 1));
-        })
-        .catch(() => {});
-    }
+    const jobId = jobs ? jobs.split(",")[0] : loadSession(SESSION_KEY)?.job_id;
+    if (!jobId) return;
+
+    api.get<{ status: string; filename: string; page_count: number; thumbnails?: string[] }>(
+      `/api/pdf/jobs/${jobId}?with_thumbnails=true`
+    )
+      .then((data) => {
+        const thumbs = data.thumbnails?.length ? data.thumbnails : loadThumbs(SESSION_KEY);
+        setUpload({ job_id: jobId, filename: data.filename, page_count: data.page_count, thumbnails: thumbs });
+        setSelectedPages(Array.from({ length: data.page_count }, (_, i) => i + 1));
+        saveSession(SESSION_KEY, { job_id: jobId, filename: data.filename, page_count: data.page_count });
+      })
+      .catch(() => clearSession(SESSION_KEY));
   }, [searchParams]);
 
   const handleUploaded = (result: UploadResult) => {
@@ -87,6 +94,8 @@ function TranslateInner() {
     setSelectedPages(Array.from({ length: result.page_count }, (_, i) => i + 1));
     setTranslatePages({});
     setError("");
+    saveSession(SESSION_KEY, { job_id: result.job_id, filename: result.filename, page_count: result.page_count });
+    saveThumbs(SESSION_KEY, result.thumbnails);
   };
 
   const startTranslate = async () => {
@@ -161,7 +170,7 @@ function TranslateInner() {
                 <span className="font-bold">{upload.filename}</span>
                 <span className="text-muted text-sm" style={{ marginLeft: 12 }}>{upload.page_count}페이지</span>
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => { setUpload(null); setTranslatePages({}); }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => { setUpload(null); setTranslatePages({}); clearSession(SESSION_KEY); }}>
                 다른 파일
               </button>
             </div>

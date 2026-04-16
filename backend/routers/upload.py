@@ -24,6 +24,16 @@ _jobs: dict = {}
 def get_job(job_id: str) -> dict:
     j = _jobs.get(job_id)
     if not j:
+        # 디스크에서 복구 시도
+        job_json = os.path.join(TMP_DIR, job_id, "job.json")
+        if os.path.exists(job_json):
+            try:
+                with open(job_json, "r", encoding="utf-8") as f:
+                    j = json.load(f)
+                _jobs[job_id] = j
+            except Exception:
+                pass
+    if not j:
         raise HTTPException(404, "Job not found")
     return j
 
@@ -90,13 +100,24 @@ async def upload_pdf(request: Request):
     thumbs = pdf_thumbnails(pdf_bytes, dpi=72)
     thumb_b64 = [base64.b64encode(t).decode() for t in thumbs]
 
-    set_job(job_id, {
+    job_data = {
+        "job_id": job_id,
         "status": "UPLOADED",
         "filename": filename,
         "page_count": page_count,
-        "job_dir": job_dir,
         "pdf_path": pdf_path,
-    })
+        "job_dir": job_dir,
+        "created_at": datetime.now().isoformat(),
+    }
+    set_job(job_id, job_data)
+
+    # Job 메타데이터를 디스크에 저장 (세션 유지용)
+    try:
+        job_json = os.path.join(job_dir, "job.json")
+        with open(job_json, "w", encoding="utf-8") as f:
+            json.dump(job_data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        logger.exception("job.json 저장 실패")
 
     log_file_action(job_dir, filename, "upload", size=len(pdf_bytes), request=request)
 
@@ -109,10 +130,24 @@ async def upload_pdf(request: Request):
 
 
 @router.get("/jobs/{job_id}")
-def get_job_status(job_id: str):
+def get_job_status(job_id: str, with_thumbnails: bool = False):
     j = get_job(job_id)
-    return {
+    result = {
         "status": j["status"],
         "filename": j.get("filename"),
         "page_count": j.get("page_count"),
     }
+    if with_thumbnails:
+        pdf_path = j.get("pdf_path", "")
+        if pdf_path and os.path.exists(pdf_path):
+            try:
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+                thumbs = pdf_thumbnails(pdf_bytes, dpi=72)
+                result["thumbnails"] = [base64.b64encode(t).decode() for t in thumbs]
+            except Exception:
+                logger.exception("썸네일 재생성 실패")
+                result["thumbnails"] = []
+        else:
+            result["thumbnails"] = []
+    return result

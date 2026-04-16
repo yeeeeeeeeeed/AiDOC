@@ -5,12 +5,13 @@ import asyncio
 import json
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from services.pdf import pdf_to_images
 from services.vision import call_vision, call_vision_multi
+from utils.token_logger import log_tokens
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,35 +34,41 @@ SYSTEM_PROMPT = """당신은 문서 요약 전문가입니다.
 class SummaryRequest(BaseModel):
     job_id: str
     pages: List[int] = []
-    length: str = "medium"  # short / medium / detailed
+    length: str = "medium"
     custom_prompt: Optional[str] = None
 
 
 @router.post("/start")
-def start_summary(req: SummaryRequest, background_tasks: BackgroundTasks):
+def start_summary(req: SummaryRequest, background_tasks: BackgroundTasks, request: Request):
     j = get_job(req.job_id)
     pages = req.pages if req.pages else list(range(1, j["page_count"] + 1))
+    user_id = request.cookies.get("AXI-USER-ID", "")
+    filename = j.get("filename", "")
+
+    from routers.history import log_action
+    log_action("요약", "start", f"{filename}, {len(pages)}페이지, {req.length}", request)
 
     j["summary_status"] = "PROCESSING"
     j["summary_progress"] = 0
     j["summary_result"] = None
     j["summary_error"] = None
 
-    background_tasks.add_task(_run_summary, req.job_id, pages, req.length, req.custom_prompt)
+    background_tasks.add_task(_run_summary, req.job_id, pages, req.length, req.custom_prompt, user_id)
     return {"status": "started", "pages": pages}
 
 
-def _run_summary(job_id: str, pages: list[int], length: str, custom_prompt: str | None):
+def _run_summary(job_id: str, pages: list[int], length: str, custom_prompt: str | None, user_id: str = ""):
     j = _jobs.get(job_id)
     if not j:
         return
+
+    filename = j.get("filename", "")
 
     try:
         pdf_path = j["pdf_path"]
         with open(pdf_path, "rb") as f:
             pdf_bytes = f.read()
 
-        # 페이지별 이미지 생성
         all_images = []
         for page_num in pages:
             images = pdf_to_images(pdf_bytes, dpi=150, pages=[page_num - 1])
@@ -81,21 +88,24 @@ def _run_summary(job_id: str, pages: list[int], length: str, custom_prompt: str 
 
         j["summary_progress"] = 60
 
-        # 페이지가 많으면 배치로 나눠서 처리
         MAX_IMAGES_PER_CALL = 10
         partial_summaries = []
+        total_input = 0
+        total_output = 0
 
         for i in range(0, len(all_images), MAX_IMAGES_PER_CALL):
             batch = all_images[i:i + MAX_IMAGES_PER_CALL]
+            token_ctx: dict = {}
             if len(all_images) <= MAX_IMAGES_PER_CALL:
-                result = call_vision_multi(batch, SYSTEM_PROMPT, user_msg)
+                result = call_vision_multi(batch, SYSTEM_PROMPT, user_msg, token_ctx=token_ctx)
             else:
                 batch_msg = f"이 문서의 {i+1}~{i+len(batch)} 페이지 내용을 요약해주세요."
-                result = call_vision_multi(batch, SYSTEM_PROMPT, batch_msg)
+                result = call_vision_multi(batch, SYSTEM_PROMPT, batch_msg, token_ctx=token_ctx)
             partial_summaries.append(result)
+            total_input += token_ctx.get("input_tokens", 0)
+            total_output += token_ctx.get("output_tokens", 0)
             j["summary_progress"] = 60 + int((i / len(all_images)) * 30)
 
-        # 배치 요약을 합쳐서 최종 요약
         if len(partial_summaries) > 1:
             combined = "\n\n---\n\n".join(partial_summaries)
             from openai import AzureOpenAI
@@ -115,8 +125,13 @@ def _run_summary(job_id: str, pages: list[int], length: str, custom_prompt: str 
                 temperature=0,
             )
             final_summary = merge_resp.choices[0].message.content.strip()
+            if merge_resp.usage:
+                total_input += merge_resp.usage.prompt_tokens
+                total_output += merge_resp.usage.completion_tokens
         else:
             final_summary = partial_summaries[0] if partial_summaries else "요약 결과 없음"
+
+        log_tokens(user_id, job_id, "요약", filename, -1, total_input, total_output)
 
         j["summary_result"] = final_summary
         j["summary_status"] = "DONE"

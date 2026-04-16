@@ -4,7 +4,8 @@
       "Bash(py -m pip install fastapi uvicorn python-multipart python-docx)",
       "Bash(mkdir -p Input/dfs/axyard/aidoc/upload)",
       "Bash(mkdir -p Input/dfs/axyard/aidoc/download)",
-      "Bash(mkdir -p Input/dfs/axyard/aidoc/failed)"
+      "Bash(mkdir -p Input/dfs/axyard/aidoc/failed)",
+      "Bash(xargs grep *)"
     ],
     "additionalDirectories": [
       "d:\\Desktop\\IT 그룹\\AI전문가과정\\데이터마이닝\\Project\\AiDoc"
