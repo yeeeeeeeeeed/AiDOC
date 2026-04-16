@@ -4,19 +4,23 @@ const BASE = "/aidoc";
 const SSO_PORTAL = "http://swpsso.posco.net/idms/U61/jsp/redirect.jsp";
 
 export function middleware(request: NextRequest) {
-  // Next.js middleware의 pathname은 basePath 포함 (예: /aidoc/home)
+  // Next.js는 middleware의 pathname에서 basePath를 제거한다.
+  // /aidoc       → pathname = "/"
+  // /aidoc/home  → pathname = "/home"
+  // 단, 환경에 따라 포함될 수도 있으므로 양쪽 모두 처리
   const { pathname } = request.nextUrl;
 
   // 루트 경로 → /aidoc/home 리다이렉트
-  if (pathname === BASE || pathname === `${BASE}/`) {
+  if (pathname === "/" || pathname === BASE || pathname === `${BASE}/`) {
     return NextResponse.redirect(new URL(`${BASE}/home`, request.url));
   }
 
-  // API, 정적 파일은 통과
+  // API, 정적 파일은 통과 (basePath 포함/미포함 양쪽 처리)
+  const bare = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
   if (
-    pathname.startsWith(`${BASE}/api/`) ||
-    pathname.startsWith(`${BASE}/_next/`) ||
-    pathname.includes(".")
+    bare.startsWith("/api/") ||
+    bare.startsWith("/_next/") ||
+    bare.includes(".")
   ) {
     return NextResponse.next();
   }
@@ -44,8 +48,10 @@ export function middleware(request: NextRequest) {
     const host = request.headers.get("host") || request.nextUrl.host;
     const origin = `${proto}://${host}`;
     const callbackUrl = `${origin}${BASE}/api/auth/sso/callback`;
-    // returnTo에 basePath 포함 (pathname이 이미 basePath 포함)
-    const returnTo = pathname === BASE ? `${BASE}/home` : pathname;
+
+    // returnTo: basePath 포함한 전체 경로
+    const fullPath = pathname.startsWith(BASE) ? pathname : `${BASE}${pathname}`;
+    const returnTo = fullPath === BASE ? `${BASE}/home` : fullPath;
 
     const res = NextResponse.redirect(
       `${SSO_PORTAL}?redir_url=${encodeURIComponent(callbackUrl)}`
