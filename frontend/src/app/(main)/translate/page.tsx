@@ -9,6 +9,26 @@ import MarkdownView from "@/components/ui/MarkdownView";
 import api, { createSSEConnection, drmDownload } from "@/lib/api";
 import type { UploadResult, StreamEvent, FileItem, StepStatus } from "@/types";
 
+const TARGET_LANGUAGES = [
+  { value: "ko", label: "한국어" },
+  { value: "en", label: "영어" },
+  { value: "ja", label: "일본어" },
+  { value: "zh-CN", label: "중국어 (간체)" },
+  { value: "zh-TW", label: "중국어 (번체, 대만)" },
+  { value: "zh-HK", label: "중국어 (번체, 홍콩)" },
+  { value: "vi", label: "베트남어" },
+  { value: "th", label: "태국어" },
+  { value: "id", label: "인도네시아어" },
+  { value: "ms", label: "말레이어" },
+  { value: "tl", label: "필리핀어 (타갈로그)" },
+  { value: "km", label: "크메르어 (캄보디아)" },
+  { value: "my", label: "미얀마어" },
+  { value: "de", label: "독일어" },
+  { value: "fr", label: "프랑스어" },
+  { value: "es", label: "스페인어" },
+  { value: "ru", label: "러시아어" },
+];
+
 const LANGUAGES = [
   { value: "auto", label: "자동 감지" },
   { value: "en", label: "영어" },
@@ -39,6 +59,7 @@ function TranslateInner() {
   const [upload, setUpload] = useState<UploadResult | null>(null);
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [sourceLang, setSourceLang] = useState("auto");
+  const [targetLang, setTargetLang] = useState("ko");
   const [customPrompt, setCustomPrompt] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -77,6 +98,7 @@ function TranslateInner() {
         job_id: upload.job_id,
         pages: selectedPages,
         source_lang: sourceLang,
+        target_lang: targetLang,
         custom_prompt: customPrompt || null,
       });
 
@@ -162,6 +184,14 @@ function TranslateInner() {
                 <label className="text-sm text-muted">원문 언어</label>
                 <select className="select" value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}>
                   {LANGUAGES.map((l) => (
+                    <option key={l.value} value={l.value}>{l.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-muted">번역 대상 언어</label>
+                <select className="select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
+                  {TARGET_LANGUAGES.map((l) => (
                     <option key={l.value} value={l.value}>{l.label}</option>
                   ))}
                 </select>
