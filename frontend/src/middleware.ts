@@ -55,5 +55,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/aidoc/:path*"],
+  matcher: ["/aidoc", "/aidoc/:path*"],
 };
