@@ -10,13 +10,16 @@ export function middleware(request: NextRequest) {
   // 단, 환경에 따라 포함될 수도 있으므로 양쪽 모두 처리
   const { pathname } = request.nextUrl;
 
+  // basePath 제거 후 순수 경로 (bare)
+  const bare = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
+
   // 루트 경로 → /aidoc/home 리다이렉트
-  if (pathname === "/" || pathname === BASE || pathname === `${BASE}/`) {
+  // bare가 빈 문자열("") 이거나 "/"이면 루트
+  if (bare === "" || bare === "/" || pathname === "/" || pathname === BASE || pathname === `${BASE}/`) {
     return NextResponse.redirect(new URL(`${BASE}/home`, request.url));
   }
 
   // API, 정적 파일은 통과 (basePath 포함/미포함 양쪽 처리)
-  const bare = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
   if (
     bare.startsWith("/api/") ||
     bare.startsWith("/_next/") ||
