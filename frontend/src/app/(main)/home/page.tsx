@@ -129,13 +129,13 @@ export default function HomePage() {
               }}
               onMouseEnter={(e) => {
                 if (uploads.length > 0) {
-                  (e.target as HTMLElement).style.borderColor = "var(--primary)";
-                  (e.target as HTMLElement).style.background = "var(--primary-light)";
+                  (e.currentTarget as HTMLElement).style.borderColor = "var(--primary)";
+                  (e.currentTarget as HTMLElement).style.background = "var(--primary-light)";
                 }
               }}
               onMouseLeave={(e) => {
-                (e.target as HTMLElement).style.borderColor = "var(--border)";
-                (e.target as HTMLElement).style.background = "";
+                (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+                (e.currentTarget as HTMLElement).style.background = "";
               }}
             >
               <div style={{ fontSize: 28, marginBottom: 8 }}>{f.icon}</div>
