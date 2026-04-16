@@ -201,14 +201,14 @@ function ContentExtractInner() {
             </button>
           </div>
 
-          {activeTab === "preview" && <MarkdownView content={fullContent} />}
+          {activeTab === "preview" && <MarkdownView content={fullContent} hideCopy />}
           {activeTab === "pages" &&
             Object.keys(contentPages)
               .sort((a, b) => Number(a) - Number(b))
               .map((k) => (
                 <div key={k} style={{ marginBottom: 16 }}>
                   <div className="font-bold mb-2">페이지 {k}</div>
-                  <MarkdownView content={contentPages[k]} />
+                  <MarkdownView content={contentPages[k]} hideCopy />
                 </div>
               ))}
         </div>

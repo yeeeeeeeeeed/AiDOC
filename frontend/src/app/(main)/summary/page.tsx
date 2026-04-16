@@ -187,7 +187,7 @@ function SummaryInner() {
               </button>
             </div>
           </div>
-          <MarkdownView content={summary} />
+          <MarkdownView content={summary} hideCopy />
         </div>
       )}
     </div>
