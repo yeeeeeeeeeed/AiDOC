@@ -6,6 +6,11 @@ const SSO_PORTAL = "http://swpsso.posco.net/idms/U61/jsp/redirect.jsp";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // 루트 경로 → /aidoc/home 리다이렉트
+  if (pathname === BASE || pathname === `${BASE}/`) {
+    return NextResponse.redirect(new URL(`${BASE}/home`, request.url));
+  }
+
   // API, 정적 파일은 통과
   if (
     pathname.startsWith(`${BASE}/api/`) ||
