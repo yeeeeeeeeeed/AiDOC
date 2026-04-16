@@ -51,7 +51,7 @@ export default function PdfUploader({ onUploaded, multiple = false }: Props) {
 
           try {
             const drmRes = await drmUpload(file);
-            if (drmRes?.fileItem) {
+            if (drmRes?.resultStatus === "Success" && drmRes?.fileItem) {
               fileItem = drmRes.fileItem;
             }
           } catch (drmErr) {
