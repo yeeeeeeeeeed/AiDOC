@@ -29,17 +29,17 @@ const MENU: MenuItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [access, setAccess] = useState<AccessCheck | null>(null);
+  const [userName, setUserName] = useState("사용자");
 
   useEffect(() => {
     fetch(`${BACKEND}/api/admin/check`, { credentials: "include" })
       .then((r) => r.json())
       .then(setAccess)
       .catch(() => {});
-  }, []);
 
-  const userName = getCookie("AXI-USER-NAME")
-    ? decodeURIComponent(getCookie("AXI-USER-NAME"))
-    : "사용자";
+    const raw = getCookie("AXI-USER-NAME");
+    if (raw) setUserName(decodeURIComponent(raw));
+  }, []);
 
   const handleLogout = async () => {
     await fetch(`${BASE}/api/auth/sso/logout`, { method: "POST" });
