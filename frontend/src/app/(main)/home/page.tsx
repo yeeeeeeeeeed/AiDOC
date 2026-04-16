@@ -69,12 +69,13 @@ export default function HomePage() {
       <div className="card">
         <div className="card-header">PDF 업로드</div>
         <PdfUploader onUploaded={handleUploaded} multiple />
-      </div>
 
-      {/* Uploaded files */}
-      {uploads.length > 0 && (
-        <div className="card">
-          <div className="card-header">업로드된 파일 ({uploads.length}개)</div>
+        {/* Uploaded files */}
+        {uploads.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div className="text-sm" style={{ fontWeight: 600, marginBottom: 8 }}>
+              업로드된 파일 ({uploads.length}개)
+            </div>
           {uploads.map((u, i) => (
             <div
               key={u.job_id}
@@ -106,8 +107,9 @@ export default function HomePage() {
               </div>
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* Feature selection */}
       <div className="card">
