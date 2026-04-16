@@ -1,0 +1,14 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/auth/sso/callback/route": "/api/auth/sso/callback",
+  "/api/auth/me/route": "/api/auth/me",
+  "/api/auth/sso/logout/route": "/api/auth/sso/logout",
+  "/page": "/",
+  "/(main)/home/page": "/home",
+  "/(main)/compare/page": "/compare",
+  "/(main)/summary/page": "/summary",
+  "/(main)/admin/history/page": "/admin/history",
+  "/(main)/translate/page": "/translate",
+  "/(main)/extract/table/page": "/extract/table",
+  "/(main)/extract/content/page": "/extract/content"
+}

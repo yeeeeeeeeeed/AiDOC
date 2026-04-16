@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  drm-proxy:
+    build: ../../08.DRM_Proxy
+    restart: unless-stopped
+    volumes:
+      - /data2/axi:/data2/axi
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /home/pewsop/ssl/STAR.poscoenc.com_crt.pem:/etc/nginx/ssl/nginx.crt:ro
+      - /home/pewsop/ssl/STAR.poscoenc.com_key.pem:/etc/nginx/ssl/nginx.key:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - drm-proxy
