@@ -45,19 +45,26 @@ def is_allowed_user(request: Request) -> bool:
     return True  # 모든 SSO 인증 사용자 허용
 
 
+_SKIP_PATHS = {"/api/admin/check", "/health", "/api/health"}
+
 def log_visitor(request: Request):
-    """방문자 로그 기록"""
+    """방문자 로그 기록 (세션 체크·헬스체크 제외)"""
+    path = str(request.url.path)
+    if any(path.endswith(s) for s in _SKIP_PATHS):
+        return
     user_id = request.cookies.get("AXI-USER-ID", "")
     if not user_id:
         return
     today = datetime.now().strftime("%Y-%m-%d")
     log_file = os.path.join(VISITOR_LOG_DIR, f"{today}.json")
 
+    ip = request.client.host if request.client else ""
     visitors = _load_json_list(log_file) if os.path.exists(log_file) else []
     entry = {
         "user_id": user_id,
         "user_name": request.cookies.get("AXI-USER-NAME", ""),
-        "path": str(request.url.path),
+        "ip": ip,
+        "path": path,
         "method": request.method,
         "timestamp": datetime.now().isoformat(),
     }
@@ -258,6 +265,9 @@ def get_visitors(
 
     top_users = sorted(user_counts.values(), key=lambda x: x["visits"], reverse=True)
 
+    # 상세 로그 (최신순)
+    entries = sorted(all_visitors, key=lambda x: x.get("timestamp", ""), reverse=True)
+
     return {
         "date_from": date_from,
         "date_to": date_to,
@@ -265,16 +275,38 @@ def get_visitors(
         "unique_users": len(user_counts),
         "daily": daily,
         "top_users": top_users,
+        "entries": entries,
     }
 
 
 # ── 관리자 관리 ──
 
+def _lookup_names(uids: list[str]) -> dict[str, str]:
+    """최근 30일 로그에서 사용자 이름 조회"""
+    names: dict[str, str] = {}
+    remaining = set(uids)
+    current = datetime.now()
+    for i in range(30):
+        if not remaining:
+            break
+        day_str = (current - timedelta(days=i)).strftime("%Y-%m-%d")
+        for prefix in ("", "actions_"):
+            f = os.path.join(VISITOR_LOG_DIR, f"{prefix}{day_str}.json")
+            for entry in _load_json_list(f):
+                uid = entry.get("user_id", "")
+                if uid in remaining and entry.get("user_name"):
+                    names[uid] = entry["user_name"]
+                    remaining.discard(uid)
+    return names
+
+
 @router.get("/users")
 def get_user_list(request: Request):
     if not is_admin(request):
         raise HTTPException(403, "관리자만 접근할 수 있습니다.")
-    return {"admins": _get_admins()}
+    admins = _get_admins()
+    names = _lookup_names(admins)
+    return {"admins": [{"user_id": uid, "user_name": names.get(uid, "")} for uid in admins]}
 
 
 @router.post("/users/add")

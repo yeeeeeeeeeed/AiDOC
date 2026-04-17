@@ -19,10 +19,15 @@ interface DayVisit {
   date: string; total_visits: number; unique_users: number;
   users: { user_id: string; user_name: string }[];
 }
+interface VisitorEntry {
+  user_id: string; user_name?: string; ip?: string;
+  path: string; timestamp: string;
+}
 interface VisitorSummary {
   date_from: string; date_to: string; total_visits: number; unique_users: number;
   daily: DayVisit[];
   top_users: { user_id: string; user_name: string; visits: number }[];
+  entries: VisitorEntry[];
 }
 
 const PRICE_INPUT_PER_M = 0.15;
@@ -322,25 +327,6 @@ export default function HistoryPage() {
               </div>
             </div>
 
-            {/* 결과 요약 배너 */}
-            {tokenTotal > 0 && (
-              <>
-                <div style={{ borderTop: "1px solid var(--border)", marginBottom: 16 }} />
-                <div className="flex gap-3 mb-3" style={{ flexWrap: "wrap" }}>
-                  {[
-                    { label: "총 요청", value: fmtNum(tokenTotal) + "건", color: "#2563eb" },
-                    { label: "입력 토큰", value: fmtNum(tokenTotalInput), color: "#16a34a" },
-                    { label: "출력 토큰", value: fmtNum(tokenTotalOutput), color: "#9333ea" },
-                    { label: "추정 비용", value: `$${totalCost.usd.toFixed(2)} / ₩${fmtNum(Math.round(totalCost.krw))}`, color: "#ea580c" },
-                  ].map((s) => (
-                    <div key={s.label} style={{ background: "var(--bg-secondary, #f8f9fa)", borderLeft: `3px solid ${s.color}`, borderRadius: "var(--radius)", padding: "10px 16px", minWidth: 140 }}>
-                      <div className="text-sm text-muted">{s.label}</div>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: s.color }}>{s.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
 
             {tokenLoading ? (
               <div className="text-center text-muted" style={{ padding: 40 }}>조회 중...</div>
@@ -384,14 +370,23 @@ export default function HistoryPage() {
       {activeTab === "visitors" && (
         <>
           <div className="card">
-            <div className="flex gap-3" style={{ flexWrap: "wrap", alignItems: "end" }}>
-              <div><label className="text-sm text-muted">시작일</label>
-                <input type="date" className="input" value={visitorDateFrom} onChange={(e) => setVisitorDateFrom(e.target.value)} /></div>
-              <div><label className="text-sm text-muted">종료일</label>
-                <input type="date" className="input" value={visitorDateTo} onChange={(e) => setVisitorDateTo(e.target.value)} /></div>
-              <div style={{ paddingTop: 20 }}>
-                <button className="btn btn-primary" onClick={fetchVisitors}>조회</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <div className="flex gap-2" style={{ alignItems: "center" }}>
+                <span className="text-sm text-muted" style={{ whiteSpace: "nowrap" }}>조회 기간</span>
+                <input type="date" className="input" style={{ width: "auto" }} value={visitorDateFrom} onChange={(e) => setVisitorDateFrom(e.target.value)} />
+                <span className="text-sm text-muted">~</span>
+                <input type="date" className="input" style={{ width: "auto" }} value={visitorDateTo} onChange={(e) => setVisitorDateTo(e.target.value)} />
+                <button className="btn btn-primary btn-sm" onClick={fetchVisitors}>조회</button>
               </div>
+              {visitorData && (
+                <button className="btn btn-secondary btn-sm" onClick={() => downloadCsv(
+                  ["날짜", "시간", "직번", "이름", "IP", "경로"],
+                  (visitorData.entries || []).map(e => {
+                    const ts = e.timestamp; const d = ts.slice(0,10); const t = ts.slice(11,19);
+                    return [d, t, e.user_id, decodeName(e.user_name), e.ip || "", e.path];
+                  })
+                , `방문자로그_${visitorDateFrom}_${visitorDateTo}.csv`)}>CSV 다운로드</button>
+              )}
             </div>
           </div>
 
@@ -399,57 +394,55 @@ export default function HistoryPage() {
             <div className="card text-center text-muted" style={{ padding: 40 }}>조회 중...</div>
           ) : visitorData ? (
             <>
-              {/* KPI */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16, margin: "0 0 16px" }}>
-                {[
-                  { label: "총 방문 횟수", value: fmtNum(visitorData.total_visits) + "회", color: "#2563eb" },
-                  { label: "순 방문자 수", value: fmtNum(visitorData.unique_users) + "명", color: "#16a34a" },
-                ].map((s) => (
-                  <div key={s.label} style={statCard(s.color)}>
-                    <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{s.label}</div>
-                    <div style={{ fontSize: 32, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
-                  </div>
-                ))}
+              {/* 일별 바 차트 */}
+              <div className="card">
+                <div className="card-header" style={{ marginBottom: 16 }}>일별 방문자 수</div>
+                {(() => {
+                  const max = Math.max(...visitorData.daily.map(d => d.unique_users), 1);
+                  return (
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120, paddingBottom: 24, position: "relative" }}>
+                      {visitorData.daily.map((d) => {
+                        const pct = (d.unique_users / max) * 100;
+                        return (
+                          <div key={d.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 2 }}>{d.unique_users || ""}</div>
+                            <div style={{ width: "100%", background: pct > 0 ? "var(--primary)" : "var(--border)", opacity: pct > 0 ? 0.7 + (pct / 100) * 0.3 : 1, height: `${Math.max(pct, 2)}%`, borderRadius: "3px 3px 0 0", transition: "height 0.3s" }} />
+                            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4, whiteSpace: "nowrap" }}>{d.date.slice(5)}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div className="card">
-                  <div className="card-header">일별 방문 현황</div>
-                  <div style={{ overflowX: "auto" }}>
-                    <table className="table-preview">
-                      <thead><tr><th>날짜</th><th>총 방문</th><th>순 방문자</th><th>방문자</th></tr></thead>
-                      <tbody>
-                        {visitorData.daily.map((d) => (
-                          <tr key={d.date}>
-                            <td>{d.date}</td>
-                            <td>{fmtNum(d.total_visits)}</td>
-                            <td>{d.unique_users}</td>
-                            <td className="text-sm text-muted">{d.users.map((u) => decodeName(u.user_name) || u.user_id).join(", ") || "-"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              {/* 상세 로그 */}
+              <div className="card">
+                <div className="flex-between mb-3">
+                  <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>방문자 상세 로그</div>
+                  <span className="text-sm text-muted">{fmtNum(visitorData.total_visits)}건</span>
                 </div>
-
-                <div className="card">
-                  <div className="card-header">사용자별 방문 횟수</div>
-                  {visitorData.top_users.length === 0 ? (
-                    <div className="text-center text-muted" style={{ padding: 24 }}>데이터 없음</div>
-                  ) : (
-                    <table className="table-preview">
-                      <thead><tr><th>순위</th><th>직번</th><th>이름</th><th>방문</th></tr></thead>
-                      <tbody>
-                        {visitorData.top_users.map((u, i) => (
-                          <tr key={u.user_id}>
-                            <td>{i + 1}</td><td>{u.user_id}</td>
-                            <td>{decodeName(u.user_name)}</td>
-                            <td>{fmtNum(u.visits)}회</td>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="table-preview">
+                    <thead><tr><th>날짜</th><th>시간</th><th>직번</th><th>이름</th><th>IP</th></tr></thead>
+                    <tbody>
+                      {(visitorData.entries || []).map((e, i) => {
+                        const ts = e.timestamp; const d = ts.slice(0,10); const t = ts.slice(11,19);
+                        return (
+                          <tr key={i}>
+                            <td className="text-sm">{d}</td>
+                            <td className="text-sm">{t}</td>
+                            <td style={{ color: "var(--primary)" }}>{e.user_id}</td>
+                            <td>{decodeName(e.user_name)}</td>
+                            <td className="text-sm text-muted">{e.ip || "-"}</td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                        );
+                      })}
+                      {(!visitorData.entries || visitorData.entries.length === 0) && (
+                        <tr><td colSpan={5} className="text-center text-muted" style={{ padding: 24 }}>데이터 없음</td></tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </>
@@ -465,9 +458,11 @@ export default function HistoryPage() {
   );
 }
 
+interface AdminEntry { user_id: string; user_name: string; }
+
 function AdminManager() {
   const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "/aidoc-api";
-  const [admins, setAdmins] = useState<string[]>([]);
+  const [admins, setAdmins] = useState<AdminEntry[]>([]);
   const [newId, setNewId] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -521,16 +516,17 @@ function AdminManager() {
         <div className="card-header">관리자 목록</div>
         {loading ? <div className="text-muted text-sm" style={{ padding: 16 }}>불러오는 중...</div> : (
           <table className="table-preview">
-            <thead><tr><th>직번</th><th>권한</th><th>관리</th></tr></thead>
+            <thead><tr><th>직번</th><th>이름</th><th>권한</th><th>관리</th></tr></thead>
             <tbody>
-              {admins.map((uid) => (
-                <tr key={uid}>
-                  <td>{uid}</td>
+              {admins.map((a) => (
+                <tr key={a.user_id}>
+                  <td>{a.user_id}</td>
+                  <td>{decodeName(a.user_name) || <span className="text-muted">-</span>}</td>
                   <td><span className="badge badge-info">관리자</span></td>
-                  <td><button className="btn btn-secondary btn-sm" onClick={() => removeAdmin(uid)}>삭제</button></td>
+                  <td><button className="btn btn-secondary btn-sm" onClick={() => removeAdmin(a.user_id)}>삭제</button></td>
                 </tr>
               ))}
-              {admins.length === 0 && <tr><td colSpan={3} className="text-center text-muted" style={{ padding: 24 }}>등록된 관리자 없음</td></tr>}
+              {admins.length === 0 && <tr><td colSpan={4} className="text-center text-muted" style={{ padding: 24 }}>등록된 관리자 없음</td></tr>}
             </tbody>
           </table>
         )}
