@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AccessCheck } from "@/types";
-import { getCookie } from "@/lib/utils";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH || "/aidoc";
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "/aidoc-api";
@@ -34,13 +33,13 @@ export default function Sidebar() {
   useEffect(() => {
     fetch(`${BACKEND}/api/admin/check`, { credentials: "include" })
       .then((r) => r.json())
-      .then(setAccess)
+      .then((data: AccessCheck) => {
+        setAccess(data);
+        if (data.user_name) {
+          try { setUserName(decodeURIComponent(data.user_name)); } catch { setUserName(data.user_name); }
+        }
+      })
       .catch(() => {});
-
-    const raw = getCookie("AXI-USER-NAME");
-    if (raw) {
-      try { setUserName(decodeURIComponent(raw)); } catch { setUserName(raw); }
-    }
   }, []);
 
   const handleLogout = async () => {

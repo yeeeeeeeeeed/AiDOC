@@ -54,6 +54,7 @@ def start_extract(req: ExtractRequest, background_tasks: BackgroundTasks, reques
     j = get_job(req.job_id)
     pages = req.pages if req.pages else list(range(1, j["page_count"] + 1))
     user_id = request.cookies.get("AXI-USER-ID", "")
+    user_name = request.cookies.get("AXI-USER-NAME", "")
     filename = j.get("filename", "")
 
     from routers.history import log_action
@@ -65,11 +66,11 @@ def start_extract(req: ExtractRequest, background_tasks: BackgroundTasks, reques
     j["tables"] = []
     j["table_error"] = None
 
-    background_tasks.add_task(_run_extract, req.job_id, pages, req.custom_prompt, user_id)
+    background_tasks.add_task(_run_extract, req.job_id, pages, req.custom_prompt, user_id, user_name)
     return {"status": "started", "pages": pages}
 
 
-def _run_extract(job_id: str, pages: list[int], custom_prompt: str | None, user_id: str = ""):
+def _run_extract(job_id: str, pages: list[int], custom_prompt: str | None, user_id: str = "", user_name: str = ""):
     j = _jobs.get(job_id)
     if not j:
         return
@@ -105,7 +106,7 @@ def _run_extract(job_id: str, pages: list[int], custom_prompt: str | None, user_
                 all_tables.extend(tables)
 
                 log_tokens(user_id, job_id, "표추출", filename, page_num,
-                           token_ctx.get("input_tokens", 0), token_ctx.get("output_tokens", 0))
+                           token_ctx.get("input_tokens", 0), token_ctx.get("output_tokens", 0), user_name)
 
                 j["table_steps"][idx]["status"] = "done"
                 j["table_steps"][idx]["detail"] = f"{len(tables)}개 표"

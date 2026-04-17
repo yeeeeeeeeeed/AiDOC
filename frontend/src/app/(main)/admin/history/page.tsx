@@ -10,6 +10,7 @@ const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "/aidoc-api";
 interface TokenEntry {
   timestamp: string;
   user_id: string;
+  user_name?: string;
   job_id: string;
   menu: string;
   filename: string;
@@ -26,6 +27,22 @@ interface TokenMonth {
   unique_users: number;
 }
 
+interface DayVisit {
+  date: string;
+  total_visits: number;
+  unique_users: number;
+  users: { user_id: string; user_name: string }[];
+}
+
+interface VisitorSummary {
+  date_from: string;
+  date_to: string;
+  total_visits: number;
+  unique_users: number;
+  daily: DayVisit[];
+  top_users: { user_id: string; user_name: string; visits: number }[];
+}
+
 // Azure OpenAI gpt-5.4-mini 기준 추정 단가 (USD/1M tokens → KRW 환산)
 const PRICE_INPUT_PER_M = 0.15;  // USD
 const PRICE_OUTPUT_PER_M = 0.60; // USD
@@ -40,20 +57,35 @@ function fmtNum(n: number) {
   return n.toLocaleString("ko-KR");
 }
 
+function lastWeek() {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(to.getDate() - 7);
+  return {
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+  };
+}
+
+function decodeName(name: string | undefined): string {
+  if (!name) return "";
+  try { return decodeURIComponent(name); } catch { return name; }
+}
+
 export default function HistoryPage() {
   const [access, setAccess] = useState<AccessCheck | null>(null);
-  const [activeTab, setActiveTab] = useState<"history" | "tokens" | "users">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "tokens" | "visitors" | "users">("history");
 
-  // 이력 탭 상태
+  // 이력 탭
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
-  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
+  const [dateFrom, setDateFrom] = useState(lastWeek().from);
+  const [dateTo, setDateTo] = useState(lastWeek().to);
   const [filterUser, setFilterUser] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 토큰 탭 상태
+  // 토큰 탭
   const [tokenYear, setTokenYear] = useState(new Date().getFullYear().toString());
   const [tokenMonths, setTokenMonths] = useState<TokenMonth[]>([]);
   const [tokenItems, setTokenItems] = useState<TokenEntry[]>([]);
@@ -61,11 +93,17 @@ export default function HistoryPage() {
   const [tokenTotalInput, setTokenTotalInput] = useState(0);
   const [tokenTotalOutput, setTokenTotalOutput] = useState(0);
   const [tokenPage, setTokenPage] = useState(1);
-  const [tokenDateFrom, setTokenDateFrom] = useState(new Date().toISOString().slice(0, 10));
-  const [tokenDateTo, setTokenDateTo] = useState(new Date().toISOString().slice(0, 10));
+  const [tokenDateFrom, setTokenDateFrom] = useState(lastWeek().from);
+  const [tokenDateTo, setTokenDateTo] = useState(lastWeek().to);
   const [tokenFilterUser, setTokenFilterUser] = useState("");
   const [tokenFilterMenu, setTokenFilterMenu] = useState("");
   const [tokenLoading, setTokenLoading] = useState(false);
+
+  // 방문 통계 탭
+  const [visitorDateFrom, setVisitorDateFrom] = useState(lastWeek().from);
+  const [visitorDateTo, setVisitorDateTo] = useState(lastWeek().to);
+  const [visitorData, setVisitorData] = useState<VisitorSummary | null>(null);
+  const [visitorLoading, setVisitorLoading] = useState(false);
 
   useEffect(() => {
     fetch(`${BACKEND}/api/admin/check`, { credentials: "include" })
@@ -87,7 +125,6 @@ export default function HistoryPage() {
       setItems(res.items);
       setTotal(res.total);
     } catch {
-      // ignore
     } finally {
       setLoading(false);
     }
@@ -129,6 +166,19 @@ export default function HistoryPage() {
     }
   }, [tokenDateFrom, tokenDateTo, tokenPage, tokenFilterUser, tokenFilterMenu]);
 
+  const fetchVisitors = useCallback(async () => {
+    setVisitorLoading(true);
+    try {
+      const res = await api.get<VisitorSummary>(
+        `/api/admin/visitors?date_from=${visitorDateFrom}&date_to=${visitorDateTo}`
+      );
+      setVisitorData(res);
+    } catch {
+    } finally {
+      setVisitorLoading(false);
+    }
+  }, [visitorDateFrom, visitorDateTo]);
+
   useEffect(() => {
     if (access?.is_admin) fetchHistory();
   }, [access, page, fetchHistory]);
@@ -140,10 +190,14 @@ export default function HistoryPage() {
     }
   }, [access, activeTab, fetchTokenSummary, fetchTokenDetail]);
 
+  useEffect(() => {
+    if (access?.is_admin && activeTab === "visitors") fetchVisitors();
+  }, [access, activeTab, fetchVisitors]);
+
   if (access && !access.is_admin) {
     return (
       <div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>이력 관리</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>관리자</h1>
         <div className="card text-center" style={{ padding: 60 }}>
           <div style={{ fontSize: 48, marginBottom: 16, color: "var(--text-muted)" }}>!</div>
           <div className="font-bold">관리자만 접근할 수 있습니다.</div>
@@ -157,18 +211,13 @@ export default function HistoryPage() {
   return (
     <div>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>관리자</h1>
-      <p className="text-muted mb-4">시스템 이력, 토큰 비용, 사용자 권한을 관리합니다.</p>
+      <p className="text-muted mb-4">시스템 이력, 토큰 비용, 방문 통계, 관리자 권한을 관리합니다.</p>
 
       <div className="tabs" style={{ marginBottom: 0 }}>
-        <button className={`tab ${activeTab === "history" ? "active" : ""}`} onClick={() => setActiveTab("history")}>
-          작업 이력
-        </button>
-        <button className={`tab ${activeTab === "tokens" ? "active" : ""}`} onClick={() => setActiveTab("tokens")}>
-          토큰 사용량
-        </button>
-        <button className={`tab ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>
-          사용자 관리
-        </button>
+        <button className={`tab ${activeTab === "history" ? "active" : ""}`} onClick={() => setActiveTab("history")}>작업 이력</button>
+        <button className={`tab ${activeTab === "tokens" ? "active" : ""}`} onClick={() => setActiveTab("tokens")}>토큰 사용량</button>
+        <button className={`tab ${activeTab === "visitors" ? "active" : ""}`} onClick={() => setActiveTab("visitors")}>방문 통계</button>
+        <button className={`tab ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>관리자 관리</button>
       </div>
 
       {/* ── 작업 이력 탭 ── */}
@@ -188,7 +237,9 @@ export default function HistoryPage() {
                 <label className="text-sm text-muted">사용자 ID</label>
                 <input className="input" placeholder="전체" value={filterUser} onChange={(e) => setFilterUser(e.target.value)} />
               </div>
-              <button className="btn btn-primary" onClick={() => { setPage(1); fetchHistory(); }}>조회</button>
+              <div style={{ paddingTop: 20 }}>
+                <button className="btn btn-primary" onClick={() => { setPage(1); fetchHistory(); }}>조회</button>
+              </div>
             </div>
           </div>
 
@@ -204,13 +255,14 @@ export default function HistoryPage() {
               <div style={{ overflowX: "auto" }}>
                 <table className="table-preview">
                   <thead>
-                    <tr><th>시간</th><th>사용자</th><th>메뉴</th><th>작업</th><th>상세</th></tr>
+                    <tr><th>시간</th><th>사용자 ID</th><th>이름</th><th>메뉴</th><th>작업</th><th>상세</th></tr>
                   </thead>
                   <tbody>
                     {items.map((item, i) => (
                       <tr key={i}>
                         <td className="text-sm">{formatDate(item.timestamp)}</td>
                         <td>{item.user_id}</td>
+                        <td>{decodeName(item.user_name)}</td>
                         <td><span className="badge badge-info">{item.menu}</span></td>
                         <td>{item.action}</td>
                         <td className="text-sm text-muted">{item.detail}</td>
@@ -234,7 +286,6 @@ export default function HistoryPage() {
       {/* ── 토큰 사용량 탭 ── */}
       {activeTab === "tokens" && (
         <>
-          {/* 월별 집계 */}
           <div className="card">
             <div className="flex-between mb-3">
               <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>월별 사용량</div>
@@ -285,14 +336,10 @@ export default function HistoryPage() {
                       const c = calcCost(tot.input_tokens, tot.output_tokens);
                       return (
                         <tr style={{ fontWeight: 700, background: "var(--primary-light)" }}>
-                          <td>합계</td>
-                          <td>{fmtNum(tot.requests)}</td>
-                          <td>-</td>
-                          <td>{fmtNum(tot.input_tokens)}</td>
-                          <td>{fmtNum(tot.output_tokens)}</td>
+                          <td>합계</td><td>{fmtNum(tot.requests)}</td><td>-</td>
+                          <td>{fmtNum(tot.input_tokens)}</td><td>{fmtNum(tot.output_tokens)}</td>
                           <td>{fmtNum(tot.input_tokens + tot.output_tokens)}</td>
-                          <td>${c.usd.toFixed(3)}</td>
-                          <td>₩{fmtNum(Math.round(c.krw))}</td>
+                          <td>${c.usd.toFixed(3)}</td><td>₩{fmtNum(Math.round(c.krw))}</td>
                         </tr>
                       );
                     })()}
@@ -305,7 +352,6 @@ export default function HistoryPage() {
             </p>
           </div>
 
-          {/* 상세 조회 */}
           <div className="card">
             <div className="card-header">상세 조회</div>
             <div className="flex gap-3 mb-3" style={{ flexWrap: "wrap", alignItems: "end" }}>
@@ -336,7 +382,6 @@ export default function HistoryPage() {
               </div>
             </div>
 
-            {/* 합계 요약 */}
             {tokenTotal > 0 && (
               <div className="flex gap-3 mb-3" style={{ flexWrap: "wrap" }}>
                 {[
@@ -362,7 +407,7 @@ export default function HistoryPage() {
                 <table className="table-preview">
                   <thead>
                     <tr>
-                      <th>시간</th><th>사용자</th><th>메뉴</th><th>파일</th><th>페이지</th>
+                      <th>시간</th><th>사용자 ID</th><th>이름</th><th>메뉴</th><th>파일</th><th>페이지</th>
                       <th>입력</th><th>출력</th><th>비용(USD)</th>
                     </tr>
                   </thead>
@@ -373,6 +418,7 @@ export default function HistoryPage() {
                         <tr key={i}>
                           <td className="text-sm">{formatDate(e.timestamp)}</td>
                           <td>{e.user_id}</td>
+                          <td>{decodeName(e.user_name)}</td>
                           <td><span className="badge badge-info">{e.menu}</span></td>
                           <td className="text-sm">{e.filename}</td>
                           <td>{e.page === -1 ? "전체" : e.page}</td>
@@ -398,20 +444,103 @@ export default function HistoryPage() {
         </>
       )}
 
-      {/* ── 사용자 관리 탭 ── */}
-      {activeTab === "users" && (
-        <UserManager />
+      {/* ── 방문 통계 탭 ── */}
+      {activeTab === "visitors" && (
+        <>
+          <div className="card">
+            <div className="flex gap-3" style={{ flexWrap: "wrap", alignItems: "end" }}>
+              <div>
+                <label className="text-sm text-muted">시작일</label>
+                <input type="date" className="input" value={visitorDateFrom} onChange={(e) => setVisitorDateFrom(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm text-muted">종료일</label>
+                <input type="date" className="input" value={visitorDateTo} onChange={(e) => setVisitorDateTo(e.target.value)} />
+              </div>
+              <div style={{ paddingTop: 20 }}>
+                <button className="btn btn-primary" onClick={fetchVisitors}>조회</button>
+              </div>
+            </div>
+          </div>
+
+          {visitorLoading ? (
+            <div className="card text-center text-muted" style={{ padding: 40 }}>조회 중...</div>
+          ) : visitorData ? (
+            <>
+              <div className="flex gap-3 mb-4" style={{ flexWrap: "wrap" }}>
+                {[
+                  { label: "총 방문 횟수", value: fmtNum(visitorData.total_visits) + "회" },
+                  { label: "순 방문자 수", value: fmtNum(visitorData.unique_users) + "명" },
+                ].map((s) => (
+                  <div key={s.label} style={{ background: "var(--bg-secondary, #f8f9fa)", borderLeft: "3px solid var(--primary)", borderRadius: "var(--radius)", padding: "12px 18px", minWidth: 160 }}>
+                    <div className="text-sm text-muted">{s.label}</div>
+                    <div style={{ fontWeight: 700, fontSize: 18 }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="card">
+                <div className="card-header">일별 방문 현황</div>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="table-preview">
+                    <thead>
+                      <tr><th>날짜</th><th>총 방문</th><th>순 방문자</th><th>방문자 목록</th></tr>
+                    </thead>
+                    <tbody>
+                      {visitorData.daily.map((d) => (
+                        <tr key={d.date}>
+                          <td>{d.date}</td>
+                          <td>{fmtNum(d.total_visits)}</td>
+                          <td>{d.unique_users}</td>
+                          <td className="text-sm text-muted">
+                            {d.users.map((u) => decodeName(u.user_name) || u.user_id).join(", ") || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {visitorData.top_users.length > 0 && (
+                <div className="card">
+                  <div className="card-header">사용자별 방문 횟수</div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="table-preview">
+                      <thead>
+                        <tr><th>순위</th><th>사용자 ID</th><th>이름</th><th>방문 횟수</th></tr>
+                      </thead>
+                      <tbody>
+                        {visitorData.top_users.map((u, i) => (
+                          <tr key={u.user_id}>
+                            <td>{i + 1}</td>
+                            <td>{u.user_id}</td>
+                            <td>{decodeName(u.user_name)}</td>
+                            <td>{fmtNum(u.visits)}회</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="card text-center text-muted" style={{ padding: 40 }}>조회 버튼을 눌러 통계를 확인하세요.</div>
+          )}
+        </>
       )}
+
+      {/* ── 관리자 관리 탭 ── */}
+      {activeTab === "users" && <AdminManager />}
     </div>
   );
 }
 
-function UserManager() {
+function AdminManager() {
   const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "/aidoc-api";
   const [admins, setAdmins] = useState<string[]>([]);
-  const [users, setUsers] = useState<string[]>([]);
   const [newId, setNewId] = useState("");
-  const [newRole, setNewRole] = useState<"user" | "admin">("user");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -421,7 +550,6 @@ function UserManager() {
       const res = await fetch(`${BACKEND}/api/admin/users`, { credentials: "include" });
       const data = await res.json();
       setAdmins(data.admins || []);
-      setUsers(data.users || []);
     } catch {
     } finally {
       setLoading(false);
@@ -430,20 +558,20 @@ function UserManager() {
 
   useEffect(() => { load(); }, [load]);
 
-  const addUser = async () => {
+  const addAdmin = async () => {
     if (!newId.trim()) return;
     await fetch(`${BACKEND}/api/admin/users/add`, {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: newId.trim(), role: newRole }),
+      body: JSON.stringify({ user_id: newId.trim() }),
     });
-    setMsg(`${newId} 추가 완료`);
+    setMsg(`${newId} 관리자 추가 완료`);
     setNewId("");
     load();
   };
 
-  const removeUser = async (uid: string) => {
-    if (!confirm(`${uid} 을 삭제하시겠습니까?`)) return;
+  const removeAdmin = async (uid: string) => {
+    if (!confirm(`${uid} 을 관리자에서 삭제하시겠습니까?`)) return;
     await fetch(`${BACKEND}/api/admin/users/remove`, {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -456,7 +584,7 @@ function UserManager() {
   return (
     <>
       <div className="card">
-        <div className="card-header">사용자 추가</div>
+        <div className="card-header">관리자 추가</div>
         <div className="flex gap-3" style={{ alignItems: "end" }}>
           <div>
             <label className="text-sm text-muted">사용자 ID (사번)</label>
@@ -465,17 +593,12 @@ function UserManager() {
               placeholder="예: 162264"
               value={newId}
               onChange={(e) => setNewId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addUser()}
+              onKeyDown={(e) => e.key === "Enter" && addAdmin()}
             />
           </div>
-          <div>
-            <label className="text-sm text-muted">권한</label>
-            <select className="select" value={newRole} onChange={(e) => setNewRole(e.target.value as "user" | "admin")}>
-              <option value="user">일반 사용자</option>
-              <option value="admin">관리자</option>
-            </select>
+          <div style={{ paddingTop: 20 }}>
+            <button className="btn btn-primary" onClick={addAdmin}>추가</button>
           </div>
-          <button className="btn btn-primary" onClick={addUser}>추가</button>
         </div>
         {msg && <p className="text-sm" style={{ color: "var(--success)", marginTop: 8 }}>{msg}</p>}
       </div>
@@ -491,21 +614,12 @@ function UserManager() {
                   <td>{uid}</td>
                   <td><span className="badge badge-info">관리자</span></td>
                   <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => removeUser(uid)}>삭제</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => removeAdmin(uid)}>삭제</button>
                   </td>
                 </tr>
               ))}
-              {users.map((uid) => (
-                <tr key={uid}>
-                  <td>{uid}</td>
-                  <td><span className="badge badge-success">일반</span></td>
-                  <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => removeUser(uid)}>삭제</button>
-                  </td>
-                </tr>
-              ))}
-              {admins.length + users.length === 0 && (
-                <tr><td colSpan={3} className="text-center text-muted" style={{ padding: 24 }}>등록된 사용자 없음</td></tr>
+              {admins.length === 0 && (
+                <tr><td colSpan={3} className="text-center text-muted" style={{ padding: 24 }}>등록된 관리자 없음</td></tr>
               )}
             </tbody>
           </table>

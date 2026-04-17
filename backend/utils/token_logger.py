@@ -10,10 +10,11 @@ os.makedirs(LOG_DIR, exist_ok=True)
 
 
 def log_tokens(user_id: str, job_id: str, menu: str, filename: str, page: int,
-               input_tokens: int, output_tokens: int):
+               input_tokens: int, output_tokens: int, user_name: str = ""):
     entry = {
         "timestamp": datetime.now().isoformat(),
         "user_id": user_id,
+        "user_name": user_name,
         "job_id": job_id,
         "menu": menu,
         "filename": filename,

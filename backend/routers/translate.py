@@ -54,6 +54,7 @@ def start_translate(req: TranslateRequest, background_tasks: BackgroundTasks, re
     j = get_job(req.job_id)
     pages = req.pages if req.pages else list(range(1, j["page_count"] + 1))
     user_id = request.cookies.get("AXI-USER-ID", "")
+    user_name = request.cookies.get("AXI-USER-NAME", "")
     filename = j.get("filename", "")
     target_name = LANG_NAMES.get(req.target_lang, req.target_lang)
 
@@ -66,12 +67,12 @@ def start_translate(req: TranslateRequest, background_tasks: BackgroundTasks, re
     j["translate_pages"] = {}
     j["translate_error"] = None
 
-    background_tasks.add_task(_run_translate, req.job_id, pages, req.source_lang, req.target_lang, req.custom_prompt, user_id)
+    background_tasks.add_task(_run_translate, req.job_id, pages, req.source_lang, req.target_lang, req.custom_prompt, user_id, user_name)
     return {"status": "started", "pages": pages}
 
 
 def _run_translate(job_id: str, pages: list[int], source_lang: str, target_lang: str,
-                   custom_prompt: str | None, user_id: str = ""):
+                   custom_prompt: str | None, user_id: str = "", user_name: str = ""):
     j = _jobs.get(job_id)
     if not j:
         return
@@ -106,7 +107,7 @@ def _run_translate(job_id: str, pages: list[int], source_lang: str, target_lang:
                 translate_pages[str(page_num)] = result
 
                 log_tokens(user_id, job_id, "번역", filename, page_num,
-                           token_ctx.get("input_tokens", 0), token_ctx.get("output_tokens", 0))
+                           token_ctx.get("input_tokens", 0), token_ctx.get("output_tokens", 0), user_name)
 
                 j["translate_steps"][idx]["status"] = "done"
                 j["translate_steps"][idx]["detail"] = f"{len(result)}자"

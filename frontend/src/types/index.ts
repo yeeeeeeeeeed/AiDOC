@@ -56,6 +56,7 @@ export interface FileItem {
 
 export interface HistoryItem {
   user_id: string;
+  user_name?: string;
   menu: string;
   action: string;
   detail: string;
