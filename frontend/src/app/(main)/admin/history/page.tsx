@@ -480,12 +480,13 @@ function AdminManager() {
 
   const addAdmin = async () => {
     if (!newId.trim()) return;
-    await fetch(`${BACKEND}/api/admin/users/add`, {
+    const res = await fetch(`${BACKEND}/api/admin/users/add`, {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: newId.trim() }),
     });
-    setMsg(`${newId} 관리자 추가 완료`); setNewId(""); load();
+    if (res.ok) { setMsg(`${newId} 관리자 추가 완료`); setNewId(""); load(); }
+    else setMsg("오류: 권한이 없거나 요청이 실패했습니다.");
   };
 
   const removeAdmin = async (uid: string) => {
