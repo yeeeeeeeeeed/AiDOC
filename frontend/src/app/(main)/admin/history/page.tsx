@@ -24,12 +24,6 @@ interface VisitorSummary {
   daily: DayVisit[];
   top_users: { user_id: string; user_name: string; visits: number }[];
 }
-interface Dashboard {
-  today_unique_visitors: number; yest_unique_visitors: number;
-  today_executions: number; week_visits: number;
-  recent_visitors: { user_id: string; user_name: string; timestamp: string }[];
-  recent_executions: HistoryItem[];
-}
 
 const PRICE_INPUT_PER_M = 0.15;
 const PRICE_OUTPUT_PER_M = 0.60;
@@ -76,10 +70,9 @@ const statCard = (color: string) => ({
   borderRadius: "var(--radius)",
   padding: "20px 24px",
 } as React.CSSProperties);
-
 export default function HistoryPage() {
   const [access, setAccess] = useState<AccessCheck | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "history" | "tokens" | "visitors" | "users">("dashboard");
+  const [activeTab, setActiveTab] = useState<"history" | "tokens" | "visitors" | "users">("history");
 
   // 이력 탭
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -111,16 +104,9 @@ export default function HistoryPage() {
   const [visitorData, setVisitorData] = useState<VisitorSummary | null>(null);
   const [visitorLoading, setVisitorLoading] = useState(false);
 
-  // 대시보드
-  const [dash, setDash] = useState<Dashboard | null>(null);
-
   useEffect(() => {
     fetch(`${BACKEND}/api/admin/check`, { credentials: "include" })
       .then((r) => r.json()).then(setAccess).catch(() => {});
-  }, []);
-
-  const fetchDashboard = useCallback(async () => {
-    try { setDash(await api.get<Dashboard>("/api/admin/dashboard")); } catch {}
   }, []);
 
   const fetchHistory = useCallback(async () => {
@@ -162,7 +148,6 @@ export default function HistoryPage() {
     } catch {} finally { setVisitorLoading(false); }
   }, [visitorDateFrom, visitorDateTo]);
 
-  useEffect(() => { if (access?.is_admin) fetchDashboard(); }, [access, fetchDashboard]);
   useEffect(() => { if (access?.is_admin && activeTab === "history") fetchHistory(); }, [access, activeTab, page]);
   useEffect(() => { if (access?.is_admin && activeTab === "tokens") { fetchTokenSummary(); fetchTokenDetail(); } }, [access, activeTab]);
   useEffect(() => { if (access?.is_admin && activeTab === "visitors") fetchVisitors(); }, [access, activeTab]);
@@ -183,105 +168,36 @@ export default function HistoryPage() {
 
   return (
     <div>
-      <p className="text-muted mb-4" style={{ fontSize: 13 }}>시스템 사용 현황을 모니터링합니다.</p>
-      <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 16 }}>관리자 대시보드</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>관리자</h1>
 
       <div className="tabs" style={{ marginBottom: 0 }}>
-        <button className={`tab ${activeTab === "dashboard" ? "active" : ""}`} onClick={() => setActiveTab("dashboard")}>대시보드</button>
         <button className={`tab ${activeTab === "history" ? "active" : ""}`} onClick={() => setActiveTab("history")}>작업 이력</button>
         <button className={`tab ${activeTab === "tokens" ? "active" : ""}`} onClick={() => setActiveTab("tokens")}>토큰 사용량</button>
         <button className={`tab ${activeTab === "visitors" ? "active" : ""}`} onClick={() => setActiveTab("visitors")}>방문자 로그</button>
         <button className={`tab ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>권한 관리</button>
       </div>
 
-      {/* ── 대시보드 ── */}
-      {activeTab === "dashboard" && (
-        <>
-          {/* KPI 카드 4개 */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, margin: "20px 0" }}>
-            {[
-              { label: "금일 방문자", value: dash?.today_unique_visitors ?? "-", sub: `어제 대비 ${dash ? (dash.today_unique_visitors - dash.yest_unique_visitors >= 0 ? "+" : "") + (dash.today_unique_visitors - dash.yest_unique_visitors) : ""}`, color: "#2563eb" },
-              { label: "금일 실행건수", value: dash?.today_executions ?? "-", sub: "실행 로그 기준", color: "#16a34a" },
-              { label: "이번주 누적 방문", value: dash?.week_visits ?? "-", sub: "최근 7일", color: "#9333ea" },
-              { label: "오늘 날짜", value: new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric" }), sub: new Date().toLocaleDateString("ko-KR", { weekday: "long" }), color: "#ea580c" },
-            ].map((s) => (
-              <div key={s.label} style={statCard(s.color)}>
-                <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{s.label}</div>
-                <div style={{ fontSize: 36, fontWeight: 700, color: s.color, lineHeight: 1 }}>{typeof s.value === "number" ? fmtNum(s.value) : s.value}</div>
-                <div className="text-sm text-muted" style={{ marginTop: 8 }}>{s.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* 최근 로그 2열 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div className="card">
-              <div className="flex-between mb-3">
-                <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>최근 방문 로그</div>
-                <span className="text-sm text-muted">오늘 {dash?.recent_visitors.length ?? 0}건</span>
-              </div>
-              {!dash?.recent_visitors.length ? (
-                <div className="text-center text-muted" style={{ padding: 24 }}>방문 기록 없음</div>
-              ) : (
-                <div>
-                  {dash.recent_visitors.map((v, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                      <span className="text-sm text-muted" style={{ width: 90, flexShrink: 0 }}>
-                        {new Date(v.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                      <span style={{ fontWeight: 600, width: 70, flexShrink: 0 }}>{v.user_id}</span>
-                      <span className="text-sm">{decodeName(v.user_name)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="card">
-              <div className="flex-between mb-3">
-                <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>최근 실행 로그</div>
-                <span className="text-sm text-muted">오늘 {dash?.today_executions ?? 0}건</span>
-              </div>
-              {!dash?.recent_executions.length ? (
-                <div className="text-center text-muted" style={{ padding: 24 }}>실행 기록 없음</div>
-              ) : (
-                <div>
-                  {dash.recent_executions.map((e, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-                      <span className="text-sm text-muted" style={{ width: 90, flexShrink: 0 }}>
-                        {new Date(e.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                      <span style={{ fontWeight: 600, width: 70, flexShrink: 0 }}>{e.user_id}</span>
-                      <span className="text-sm" style={{ marginRight: 6 }}>{decodeName(e.user_name)}</span>
-                      <span className="badge badge-info">{e.menu}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
       {/* ── 작업 이력 ── */}
       {activeTab === "history" && (
         <>
           <div className="card">
-            <div className="flex gap-3" style={{ flexWrap: "wrap", alignItems: "end" }}>
-              <div><label className="text-sm text-muted">시작일</label>
-                <input type="date" className="input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
-              <div><label className="text-sm text-muted">종료일</label>
-                <input type="date" className="input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
-              <div><label className="text-sm text-muted">직번</label>
-                <input className="input" placeholder="전체" value={filterUser} onChange={(e) => setFilterUser(e.target.value)} /></div>
-              <div><label className="text-sm text-muted">이름</label>
-                <input className="input" placeholder="전체" value={filterName} onChange={(e) => setFilterName(e.target.value)} /></div>
-              <div style={{ paddingTop: 20, display: "flex", gap: 8 }}>
-                <button className="btn btn-primary" onClick={() => { setPage(1); fetchHistory(); }}>조회</button>
-                <button className="btn btn-secondary" onClick={() => downloadCsv(
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
+              <div className="flex gap-3" style={{ flexWrap: "wrap", alignItems: "end" }}>
+                <div><label className="text-sm text-muted">시작일</label>
+                  <input type="date" className="input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+                <div><label className="text-sm text-muted">종료일</label>
+                  <input type="date" className="input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+                <div><label className="text-sm text-muted">직번</label>
+                  <input className="input" placeholder="전체" value={filterUser} onChange={(e) => setFilterUser(e.target.value)} /></div>
+                <div><label className="text-sm text-muted">이름</label>
+                  <input className="input" placeholder="전체" value={filterName} onChange={(e) => setFilterName(e.target.value)} /></div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-primary btn-sm" onClick={() => { setPage(1); fetchHistory(); }}>조회</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => downloadCsv(
                   ["시간", "직번", "이름", "메뉴", "작업", "상세"],
                   items.map(it => [formatDate(it.timestamp), it.user_id, decodeName(it.user_name), it.menu, it.action, it.detail])
-                , `작업이력_${dateFrom}_${dateTo}.csv`)}>CSV</button>
+                , `작업이력_${dateFrom}_${dateTo}.csv`)}>CSV 다운로드</button>
               </div>
             </div>
           </div>
@@ -327,10 +243,10 @@ export default function HistoryPage() {
         <>
           {/* 월별 */}
           <div className="card">
-            <div className="flex-between mb-3">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
               <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>월별 사용량</div>
-              <div className="flex gap-2" style={{ alignItems: "center" }}>
-                <select className="select" value={tokenYear} onChange={(e) => setTokenYear(e.target.value)}>
+              <div className="flex gap-2" style={{ alignItems: "center", flexShrink: 0 }}>
+                <select className="select" style={{ width: "auto" }} value={tokenYear} onChange={(e) => setTokenYear(e.target.value)}>
                   {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}년</option>)}
                 </select>
                 <button className="btn btn-primary btn-sm" onClick={fetchTokenSummary}>조회</button>
@@ -380,27 +296,29 @@ export default function HistoryPage() {
             <div className="card-header">상세 조회</div>
 
             {/* 필터 */}
-            <div className="flex gap-3 mb-4" style={{ flexWrap: "wrap", alignItems: "end" }}>
-              <div><label className="text-sm text-muted">시작일</label>
-                <input type="date" className="input" value={tokenDateFrom} onChange={(e) => setTokenDateFrom(e.target.value)} /></div>
-              <div><label className="text-sm text-muted">종료일</label>
-                <input type="date" className="input" value={tokenDateTo} onChange={(e) => setTokenDateTo(e.target.value)} /></div>
-              <div><label className="text-sm text-muted">직번</label>
-                <input className="input" placeholder="전체" value={tokenFilterUser} onChange={(e) => setTokenFilterUser(e.target.value)} /></div>
-              <div><label className="text-sm text-muted">메뉴</label>
-                <select className="select" value={tokenFilterMenu} onChange={(e) => setTokenFilterMenu(e.target.value)}>
-                  <option value="">전체</option>
-                  <option value="내용추출">내용추출</option>
-                  <option value="표추출">표추출</option>
-                  <option value="요약">요약</option>
-                  <option value="번역">번역</option>
-                </select></div>
-              <div style={{ paddingTop: 20, display: "flex", gap: 8 }}>
-                <button className="btn btn-primary" onClick={() => { setTokenPage(1); fetchTokenDetail(); }}>조회</button>
-                <button className="btn btn-secondary" onClick={() => downloadCsv(
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+              <div className="flex gap-3" style={{ flexWrap: "wrap", alignItems: "end" }}>
+                <div><label className="text-sm text-muted">시작일</label>
+                  <input type="date" className="input" value={tokenDateFrom} onChange={(e) => setTokenDateFrom(e.target.value)} /></div>
+                <div><label className="text-sm text-muted">종료일</label>
+                  <input type="date" className="input" value={tokenDateTo} onChange={(e) => setTokenDateTo(e.target.value)} /></div>
+                <div><label className="text-sm text-muted">직번</label>
+                  <input className="input" placeholder="전체" value={tokenFilterUser} onChange={(e) => setTokenFilterUser(e.target.value)} /></div>
+                <div><label className="text-sm text-muted">메뉴</label>
+                  <select className="select" value={tokenFilterMenu} onChange={(e) => setTokenFilterMenu(e.target.value)}>
+                    <option value="">전체</option>
+                    <option value="내용추출">내용추출</option>
+                    <option value="표추출">표추출</option>
+                    <option value="요약">요약</option>
+                    <option value="번역">번역</option>
+                  </select></div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-primary btn-sm" onClick={() => { setTokenPage(1); fetchTokenDetail(); }}>조회</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => downloadCsv(
                   ["시간", "직번", "이름", "메뉴", "파일", "페이지", "입력토큰", "출력토큰", "비용(USD)"],
                   tokenItems.map(e => { const c = calcCost(e.input_tokens, e.output_tokens); return [formatDate(e.timestamp), e.user_id, decodeName(e.user_name), e.menu, e.filename, e.page === -1 ? "전체" : e.page, e.input_tokens, e.output_tokens, c.usd.toFixed(4)]; })
-                , `토큰사용량_${tokenDateFrom}_${tokenDateTo}.csv`)}>CSV</button>
+                , `토큰사용량_${tokenDateFrom}_${tokenDateTo}.csv`)}>CSV 다운로드</button>
               </div>
             </div>
 
