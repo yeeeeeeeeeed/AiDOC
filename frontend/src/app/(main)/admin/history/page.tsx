@@ -42,7 +42,7 @@ function fmtNum(n: number) {
 
 export default function HistoryPage() {
   const [access, setAccess] = useState<AccessCheck | null>(null);
-  const [activeTab, setActiveTab] = useState<"history" | "tokens">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "tokens" | "users">("history");
 
   // 이력 탭 상태
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -156,8 +156,8 @@ export default function HistoryPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>이력 관리</h1>
-      <p className="text-muted mb-4">사용자 작업 이력 및 토큰 비용을 관리합니다.</p>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>관리자</h1>
+      <p className="text-muted mb-4">시스템 이력, 토큰 비용, 사용자 권한을 관리합니다.</p>
 
       <div className="tabs" style={{ marginBottom: 0 }}>
         <button className={`tab ${activeTab === "history" ? "active" : ""}`} onClick={() => setActiveTab("history")}>
@@ -165,6 +165,9 @@ export default function HistoryPage() {
         </button>
         <button className={`tab ${activeTab === "tokens" ? "active" : ""}`} onClick={() => setActiveTab("tokens")}>
           토큰 사용량
+        </button>
+        <button className={`tab ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>
+          사용자 관리
         </button>
       </div>
 
@@ -392,6 +395,120 @@ export default function HistoryPage() {
           </div>
         </>
       )}
+
+      {/* ── 사용자 관리 탭 ── */}
+      {activeTab === "users" && (
+        <UserManager />
+      )}
     </div>
+  );
+}
+
+function UserManager() {
+  const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "/aidoc-api";
+  const [admins, setAdmins] = useState<string[]>([]);
+  const [users, setUsers] = useState<string[]>([]);
+  const [newId, setNewId] = useState("");
+  const [newRole, setNewRole] = useState<"user" | "admin">("user");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND}/api/admin/users`, { credentials: "include" });
+      const data = await res.json();
+      setAdmins(data.admins || []);
+      setUsers(data.users || []);
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  }, [BACKEND]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const addUser = async () => {
+    if (!newId.trim()) return;
+    await fetch(`${BACKEND}/api/admin/users/add`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: newId.trim(), role: newRole }),
+    });
+    setMsg(`${newId} 추가 완료`);
+    setNewId("");
+    load();
+  };
+
+  const removeUser = async (uid: string) => {
+    if (!confirm(`${uid} 을 삭제하시겠습니까?`)) return;
+    await fetch(`${BACKEND}/api/admin/users/remove`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: uid }),
+    });
+    setMsg(`${uid} 삭제 완료`);
+    load();
+  };
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-header">사용자 추가</div>
+        <div className="flex gap-3" style={{ alignItems: "end" }}>
+          <div>
+            <label className="text-sm text-muted">사용자 ID (사번)</label>
+            <input
+              className="input"
+              placeholder="예: 162264"
+              value={newId}
+              onChange={(e) => setNewId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addUser()}
+            />
+          </div>
+          <div>
+            <label className="text-sm text-muted">권한</label>
+            <select className="select" value={newRole} onChange={(e) => setNewRole(e.target.value as "user" | "admin")}>
+              <option value="user">일반 사용자</option>
+              <option value="admin">관리자</option>
+            </select>
+          </div>
+          <button className="btn btn-primary" onClick={addUser}>추가</button>
+        </div>
+        {msg && <p className="text-sm" style={{ color: "var(--success)", marginTop: 8 }}>{msg}</p>}
+      </div>
+
+      <div className="card">
+        <div className="card-header">관리자 목록</div>
+        {loading ? <div className="text-muted text-sm" style={{ padding: 16 }}>불러오는 중...</div> : (
+          <table className="table-preview">
+            <thead><tr><th>사용자 ID</th><th>권한</th><th>관리</th></tr></thead>
+            <tbody>
+              {admins.map((uid) => (
+                <tr key={uid}>
+                  <td>{uid}</td>
+                  <td><span className="badge badge-info">관리자</span></td>
+                  <td>
+                    <button className="btn btn-secondary btn-sm" onClick={() => removeUser(uid)}>삭제</button>
+                  </td>
+                </tr>
+              ))}
+              {users.map((uid) => (
+                <tr key={uid}>
+                  <td>{uid}</td>
+                  <td><span className="badge badge-success">일반</span></td>
+                  <td>
+                    <button className="btn btn-secondary btn-sm" onClick={() => removeUser(uid)}>삭제</button>
+                  </td>
+                </tr>
+              ))}
+              {admins.length + users.length === 0 && (
+                <tr><td colSpan={3} className="text-center text-muted" style={{ padding: 24 }}>등록된 사용자 없음</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
   );
 }

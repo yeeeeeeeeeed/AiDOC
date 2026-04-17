@@ -92,6 +92,7 @@ function SummaryInner() {
         job_id: upload.job_id,
         content: summary,
         title: `${upload.filename} - 요약`,
+        menu: "요약",
       });
       await drmDownload(res.fileItem);
     } catch (e: unknown) {

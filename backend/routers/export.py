@@ -20,13 +20,14 @@ from routers.upload import get_job
 
 class ExcelExportRequest(BaseModel):
     job_id: str
-    tables: Optional[List] = None  # 편집된 테이블 (없으면 원본 사용)
+    tables: Optional[List] = None
 
 
 class DocxExportRequest(BaseModel):
     job_id: str
-    content: Optional[str] = None  # 편집된 마크다운 (없으면 원본 사용)
+    content: Optional[str] = None
     title: str = ""
+    menu: str = "내용추출"  # 내용추출 / 번역 / 요약
 
 
 @router.post("/excel")
@@ -40,8 +41,10 @@ def export_excel(req: ExcelExportRequest, request: Request = None):
         raise HTTPException(400, "추출된 표 데이터가 없습니다.")
 
     excel_bytes = tables_to_excel(tables)
+    j = get_job(req.job_id)
+    base = os.path.splitext(j.get("filename", "document"))[0]
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"PDF_표추출_{timestamp}.xlsx"
+    filename = f"{base}_aidoc_표추출_{timestamp}.xlsx"
 
     rel_path = f"{DOWNLOAD_DIR}/{filename}"
     write_file(rel_path, excel_bytes)
@@ -82,8 +85,10 @@ def export_docx(req: DocxExportRequest, request: Request = None):
         raise HTTPException(400, "추출된 내용이 없습니다.")
 
     docx_bytes = markdown_to_docx(content, title=req.title)
+    j2 = get_job(req.job_id)
+    base = os.path.splitext(j2.get("filename", "document"))[0]
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"PDF_내용추출_{timestamp}.docx"
+    filename = f"{base}_aidoc_{req.menu}_{timestamp}.docx"
 
     rel_path = f"{DOWNLOAD_DIR}/{filename}"
     write_file(rel_path, docx_bytes)

@@ -23,7 +23,7 @@ const MENU: MenuItem[] = [
   { label: "문서 요약", href: "/summary", icon: "≡" },
   { label: "PDF 비교", href: "/compare", icon: "⊜" },
   { label: "번역", href: "/translate", icon: "⇄" },
-  { label: "이력 관리", href: "/admin/history", icon: "⊙", adminOnly: true },
+  { label: "관리자", href: "/admin/history", icon: "⚙", adminOnly: true },
 ];
 
 export default function Sidebar() {
@@ -38,7 +38,9 @@ export default function Sidebar() {
       .catch(() => {});
 
     const raw = getCookie("AXI-USER-NAME");
-    if (raw) setUserName(decodeURIComponent(raw));
+    if (raw) {
+      try { setUserName(decodeURIComponent(raw)); } catch { setUserName(raw); }
+    }
   }, []);
 
   const handleLogout = async () => {

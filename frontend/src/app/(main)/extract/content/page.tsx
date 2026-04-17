@@ -96,6 +96,7 @@ function ContentExtractInner() {
       const res = await api.post<{ fileItem: FileItem }>("/api/pdf/export/docx", {
         job_id: upload.job_id,
         title: upload.filename.replace(".pdf", ""),
+        menu: "내용추출",
       });
       await drmDownload(res.fileItem);
     } catch (e: unknown) {

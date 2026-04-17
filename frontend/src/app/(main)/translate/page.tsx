@@ -144,6 +144,7 @@ function TranslateInner() {
         job_id: upload.job_id,
         content: fullContent,
         title: `${upload.filename} - 번역`,
+        menu: "번역",
       });
       await drmDownload(res.fileItem);
     } catch (e: unknown) {
