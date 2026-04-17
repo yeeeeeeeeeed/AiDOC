@@ -45,19 +45,18 @@ def is_allowed_user(request: Request) -> bool:
     return True  # 모든 SSO 인증 사용자 허용
 
 
-_SKIP_PATHS = {"/health", "/api/health"}
 _VISIT_DEDUP_MINUTES = 25  # 세션 30분 갱신보다 짧게 — 실제 재방문만 기록
 
 def log_visitor(request: Request):
     """방문자 로그 기록.
-    /api/admin/check 는 페이지 로드 시그널로 사용하되,
-    25분 이내 동일 사용자 중복 기록은 건너뜀 (세션 자동 갱신 제외).
+    /api/admin/check 호출만 페이지 로드 시그널로 사용,
+    25분 이내 동일 사용자 재기록은 건너뜀.
     """
     path = str(request.url.path)
-    if any(path.endswith(s) for s in _SKIP_PATHS):
+    if not path.endswith("/api/admin/check"):
         return
 
-    is_check = path.endswith("/api/admin/check")
+    is_check = True
 
     user_id = request.cookies.get("AXI-USER-ID", "")
     if not user_id:
