@@ -97,12 +97,68 @@ def check_access(request: Request):
     }
 
 
+@router.get("/dashboard")
+def get_dashboard(request: Request):
+    """관리자 대시보드 통계"""
+    if not is_admin(request):
+        raise HTTPException(403, "관리자만 접근할 수 있습니다.")
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    def read_visitors(date: str):
+        f = os.path.join(VISITOR_LOG_DIR, f"{date}.json")
+        return _load_json_list(f) if os.path.exists(f) else []
+
+    def read_actions(date: str):
+        f = os.path.join(VISITOR_LOG_DIR, f"actions_{date}.json")
+        return _load_json_list(f) if os.path.exists(f) else []
+
+    today_visitors = read_visitors(today)
+    yest_visitors = read_visitors(yesterday)
+    today_actions = read_actions(today)
+
+    today_unique = len(set(v.get("user_id") for v in today_visitors if v.get("user_id")))
+    yest_unique = len(set(v.get("user_id") for v in yest_visitors if v.get("user_id")))
+
+    # 이번 주 누적 방문
+    week_visits = 0
+    cur = datetime.now() - timedelta(days=6)
+    while cur <= datetime.now():
+        day_v = read_visitors(cur.strftime("%Y-%m-%d"))
+        week_visits += len(set(v.get("user_id") for v in day_v if v.get("user_id")))
+        cur += timedelta(days=1)
+
+    # 최근 방문자 (오늘 기준 최신순, 중복 제거)
+    seen = set()
+    recent_visitors = []
+    for v in sorted(today_visitors, key=lambda x: x.get("timestamp", ""), reverse=True):
+        uid = v.get("user_id", "")
+        if uid and uid not in seen:
+            seen.add(uid)
+            recent_visitors.append({"user_id": uid, "user_name": v.get("user_name", ""), "timestamp": v.get("timestamp", "")})
+        if len(recent_visitors) >= 10:
+            break
+
+    recent_executions = sorted(today_actions, key=lambda x: x.get("timestamp", ""), reverse=True)[:10]
+
+    return {
+        "today_unique_visitors": today_unique,
+        "yest_unique_visitors": yest_unique,
+        "today_executions": len(today_actions),
+        "week_visits": week_visits,
+        "recent_visitors": recent_visitors,
+        "recent_executions": recent_executions,
+    }
+
+
 @router.get("/history")
 def get_history(
     request: Request,
     date_from: str = "",
     date_to: str = "",
     user_id: str = "",
+    user_name: str = "",
     action_type: str = "",
     page: int = 1,
     size: int = 50,
@@ -129,6 +185,9 @@ def get_history(
 
     if user_id:
         all_actions = [a for a in all_actions if a.get("user_id") == user_id]
+    if user_name:
+        kw = user_name.lower()
+        all_actions = [a for a in all_actions if kw in a.get("user_name", "").lower()]
     if action_type:
         all_actions = [a for a in all_actions if a.get("action") == action_type]
 
@@ -136,7 +195,7 @@ def get_history(
 
     total = len(all_actions)
     start = (page - 1) * size
-    items = all_actions[start:start + size]
+    items = all_actions[start:start + size] if size > 0 else all_actions
 
     return {
         "items": items,

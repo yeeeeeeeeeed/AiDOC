@@ -8,73 +8,74 @@ import type { HistoryItem, AccessCheck } from "@/types";
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "/aidoc-api";
 
 interface TokenEntry {
-  timestamp: string;
-  user_id: string;
-  user_name?: string;
-  job_id: string;
-  menu: string;
-  filename: string;
-  page: number;
-  input_tokens: number;
-  output_tokens: number;
+  timestamp: string; user_id: string; user_name?: string;
+  job_id: string; menu: string; filename: string;
+  page: number; input_tokens: number; output_tokens: number;
 }
-
 interface TokenMonth {
-  month: string;
-  requests: number;
-  input_tokens: number;
-  output_tokens: number;
-  unique_users: number;
+  month: string; requests: number; input_tokens: number; output_tokens: number; unique_users: number;
 }
-
 interface DayVisit {
-  date: string;
-  total_visits: number;
-  unique_users: number;
+  date: string; total_visits: number; unique_users: number;
   users: { user_id: string; user_name: string }[];
 }
-
 interface VisitorSummary {
-  date_from: string;
-  date_to: string;
-  total_visits: number;
-  unique_users: number;
+  date_from: string; date_to: string; total_visits: number; unique_users: number;
   daily: DayVisit[];
   top_users: { user_id: string; user_name: string; visits: number }[];
 }
+interface Dashboard {
+  today_unique_visitors: number; yest_unique_visitors: number;
+  today_executions: number; week_visits: number;
+  recent_visitors: { user_id: string; user_name: string; timestamp: string }[];
+  recent_executions: HistoryItem[];
+}
 
-// Azure OpenAI gpt-5.4-mini 기준 추정 단가 (USD/1M tokens → KRW 환산)
-const PRICE_INPUT_PER_M = 0.15;  // USD
-const PRICE_OUTPUT_PER_M = 0.60; // USD
+const PRICE_INPUT_PER_M = 0.15;
+const PRICE_OUTPUT_PER_M = 0.60;
 const USD_TO_KRW = 1380;
 
 function calcCost(input: number, output: number) {
   const usd = (input / 1_000_000) * PRICE_INPUT_PER_M + (output / 1_000_000) * PRICE_OUTPUT_PER_M;
   return { usd, krw: usd * USD_TO_KRW };
 }
-
-function fmtNum(n: number) {
-  return n.toLocaleString("ko-KR");
-}
+function fmtNum(n: number) { return n.toLocaleString("ko-KR"); }
 
 function lastWeek() {
-  const to = new Date();
-  const from = new Date();
+  const to = new Date(); const from = new Date();
   from.setDate(to.getDate() - 7);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-  };
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
 }
 
-function decodeName(name: string | undefined): string {
+function decodeName(name?: string): string {
   if (!name) return "";
   try { return decodeURIComponent(name); } catch { return name; }
 }
 
+function downloadCsv(headers: string[], rows: (string | number)[][], filename: string) {
+  const bom = "\ufeff";
+  const csv = [headers, ...rows]
+    .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+  const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── 공통 스타일 ──
+const statCard = (color: string) => ({
+  background: "var(--bg-card, #fff)",
+  border: "1px solid var(--border)",
+  borderTop: `3px solid ${color}`,
+  borderRadius: "var(--radius)",
+  padding: "20px 24px",
+} as React.CSSProperties);
+
 export default function HistoryPage() {
   const [access, setAccess] = useState<AccessCheck | null>(null);
-  const [activeTab, setActiveTab] = useState<"history" | "tokens" | "visitors" | "users">("history");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "history" | "tokens" | "visitors" | "users">("dashboard");
 
   // 이력 탭
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -83,6 +84,7 @@ export default function HistoryPage() {
   const [dateFrom, setDateFrom] = useState(lastWeek().from);
   const [dateTo, setDateTo] = useState(lastWeek().to);
   const [filterUser, setFilterUser] = useState("");
+  const [filterName, setFilterName] = useState("");
   const [loading, setLoading] = useState(false);
 
   // 토큰 탭
@@ -105,36 +107,32 @@ export default function HistoryPage() {
   const [visitorData, setVisitorData] = useState<VisitorSummary | null>(null);
   const [visitorLoading, setVisitorLoading] = useState(false);
 
+  // 대시보드
+  const [dash, setDash] = useState<Dashboard | null>(null);
+
   useEffect(() => {
     fetch(`${BACKEND}/api/admin/check`, { credentials: "include" })
-      .then((r) => r.json())
-      .then(setAccess)
-      .catch(() => {});
+      .then((r) => r.json()).then(setAccess).catch(() => {});
+  }, []);
+
+  const fetchDashboard = useCallback(async () => {
+    try { setDash(await api.get<Dashboard>("/api/admin/dashboard")); } catch {}
   }, []);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        date_from: dateFrom, date_to: dateTo, page: String(page), size: "50",
-      });
+      const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo, page: String(page), size: "50" });
       if (filterUser) params.set("user_id", filterUser);
-      const res = await api.get<{ items: HistoryItem[]; total: number; page: number; total_pages: number }>(
-        `/api/admin/history?${params}`
-      );
-      setItems(res.items);
-      setTotal(res.total);
-    } catch {
-    } finally {
-      setLoading(false);
-    }
-  }, [dateFrom, dateTo, page, filterUser]);
+      if (filterName) params.set("user_name", filterName);
+      const res = await api.get<{ items: HistoryItem[]; total: number }>(`/api/admin/history?${params}`);
+      setItems(res.items); setTotal(res.total);
+    } catch {} finally { setLoading(false); }
+  }, [dateFrom, dateTo, page, filterUser, filterName]);
 
   const fetchTokenSummary = useCallback(async () => {
     try {
-      const res = await api.get<{ year: string; months: TokenMonth[] }>(
-        `/api/admin/tokens/summary?year=${tokenYear}`
-      );
+      const res = await api.get<{ months: TokenMonth[] }>(`/api/admin/tokens/summary?year=${tokenYear}`);
       setTokenMonths(res.months);
     } catch {}
   }, [tokenYear]);
@@ -142,57 +140,28 @@ export default function HistoryPage() {
   const fetchTokenDetail = useCallback(async () => {
     setTokenLoading(true);
     try {
-      const params = new URLSearchParams({
-        date_from: tokenDateFrom, date_to: tokenDateTo,
-        page: String(tokenPage), size: "50",
-      });
+      const params = new URLSearchParams({ date_from: tokenDateFrom, date_to: tokenDateTo, page: String(tokenPage), size: "50" });
       if (tokenFilterUser) params.set("user_id", tokenFilterUser);
       if (tokenFilterMenu) params.set("menu", tokenFilterMenu);
-
-      const res = await api.get<{
-        items: TokenEntry[];
-        total: number;
-        total_input_tokens: number;
-        total_output_tokens: number;
-        total_pages: number;
-      }>(`/api/admin/tokens/detail?${params}`);
-      setTokenItems(res.items);
-      setTokenTotal(res.total);
-      setTokenTotalInput(res.total_input_tokens);
-      setTokenTotalOutput(res.total_output_tokens);
-    } catch {
-    } finally {
-      setTokenLoading(false);
-    }
+      const res = await api.get<{ items: TokenEntry[]; total: number; total_input_tokens: number; total_output_tokens: number }>(
+        `/api/admin/tokens/detail?${params}`
+      );
+      setTokenItems(res.items); setTokenTotal(res.total);
+      setTokenTotalInput(res.total_input_tokens); setTokenTotalOutput(res.total_output_tokens);
+    } catch {} finally { setTokenLoading(false); }
   }, [tokenDateFrom, tokenDateTo, tokenPage, tokenFilterUser, tokenFilterMenu]);
 
   const fetchVisitors = useCallback(async () => {
     setVisitorLoading(true);
     try {
-      const res = await api.get<VisitorSummary>(
-        `/api/admin/visitors?date_from=${visitorDateFrom}&date_to=${visitorDateTo}`
-      );
-      setVisitorData(res);
-    } catch {
-    } finally {
-      setVisitorLoading(false);
-    }
+      setVisitorData(await api.get<VisitorSummary>(`/api/admin/visitors?date_from=${visitorDateFrom}&date_to=${visitorDateTo}`));
+    } catch {} finally { setVisitorLoading(false); }
   }, [visitorDateFrom, visitorDateTo]);
 
-  useEffect(() => {
-    if (access?.is_admin) fetchHistory();
-  }, [access, page, fetchHistory]);
-
-  useEffect(() => {
-    if (access?.is_admin && activeTab === "tokens") {
-      fetchTokenSummary();
-      fetchTokenDetail();
-    }
-  }, [access, activeTab, fetchTokenSummary, fetchTokenDetail]);
-
-  useEffect(() => {
-    if (access?.is_admin && activeTab === "visitors") fetchVisitors();
-  }, [access, activeTab, fetchVisitors]);
+  useEffect(() => { if (access?.is_admin) fetchDashboard(); }, [access, fetchDashboard]);
+  useEffect(() => { if (access?.is_admin && activeTab === "history") fetchHistory(); }, [access, activeTab, page]);
+  useEffect(() => { if (access?.is_admin && activeTab === "tokens") { fetchTokenSummary(); fetchTokenDetail(); } }, [access, activeTab]);
+  useEffect(() => { if (access?.is_admin && activeTab === "visitors") fetchVisitors(); }, [access, activeTab]);
 
   if (access && !access.is_admin) {
     return (
@@ -210,43 +179,111 @@ export default function HistoryPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>관리자</h1>
-      <p className="text-muted mb-4">시스템 이력, 토큰 비용, 방문 통계, 관리자 권한을 관리합니다.</p>
+      <p className="text-muted mb-4" style={{ fontSize: 13 }}>시스템 사용 현황을 모니터링합니다.</p>
+      <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 16 }}>관리자 대시보드</h1>
 
       <div className="tabs" style={{ marginBottom: 0 }}>
+        <button className={`tab ${activeTab === "dashboard" ? "active" : ""}`} onClick={() => setActiveTab("dashboard")}>대시보드</button>
         <button className={`tab ${activeTab === "history" ? "active" : ""}`} onClick={() => setActiveTab("history")}>작업 이력</button>
         <button className={`tab ${activeTab === "tokens" ? "active" : ""}`} onClick={() => setActiveTab("tokens")}>토큰 사용량</button>
-        <button className={`tab ${activeTab === "visitors" ? "active" : ""}`} onClick={() => setActiveTab("visitors")}>방문 통계</button>
-        <button className={`tab ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>관리자 관리</button>
+        <button className={`tab ${activeTab === "visitors" ? "active" : ""}`} onClick={() => setActiveTab("visitors")}>방문자 로그</button>
+        <button className={`tab ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>권한 관리</button>
       </div>
 
-      {/* ── 작업 이력 탭 ── */}
+      {/* ── 대시보드 ── */}
+      {activeTab === "dashboard" && (
+        <>
+          {/* KPI 카드 4개 */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, margin: "20px 0" }}>
+            {[
+              { label: "금일 방문자", value: dash?.today_unique_visitors ?? "-", sub: `어제 대비 ${dash ? (dash.today_unique_visitors - dash.yest_unique_visitors >= 0 ? "+" : "") + (dash.today_unique_visitors - dash.yest_unique_visitors) : ""}`, color: "#2563eb" },
+              { label: "금일 실행건수", value: dash?.today_executions ?? "-", sub: "실행 로그 기준", color: "#16a34a" },
+              { label: "이번주 누적 방문", value: dash?.week_visits ?? "-", sub: "최근 7일", color: "#9333ea" },
+              { label: "오늘 날짜", value: new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric" }), sub: new Date().toLocaleDateString("ko-KR", { weekday: "long" }), color: "#ea580c" },
+            ].map((s) => (
+              <div key={s.label} style={statCard(s.color)}>
+                <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{s.label}</div>
+                <div style={{ fontSize: 36, fontWeight: 700, color: s.color, lineHeight: 1 }}>{typeof s.value === "number" ? fmtNum(s.value) : s.value}</div>
+                <div className="text-sm text-muted" style={{ marginTop: 8 }}>{s.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* 최근 로그 2열 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div className="card">
+              <div className="flex-between mb-3">
+                <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>최근 방문 로그</div>
+                <span className="text-sm text-muted">오늘 {dash?.recent_visitors.length ?? 0}건</span>
+              </div>
+              {!dash?.recent_visitors.length ? (
+                <div className="text-center text-muted" style={{ padding: 24 }}>방문 기록 없음</div>
+              ) : (
+                <div>
+                  {dash.recent_visitors.map((v, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                      <span className="text-sm text-muted" style={{ width: 90, flexShrink: 0 }}>
+                        {new Date(v.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span style={{ fontWeight: 600, width: 70, flexShrink: 0 }}>{v.user_id}</span>
+                      <span className="text-sm">{decodeName(v.user_name)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="card">
+              <div className="flex-between mb-3">
+                <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>최근 실행 로그</div>
+                <span className="text-sm text-muted">오늘 {dash?.today_executions ?? 0}건</span>
+              </div>
+              {!dash?.recent_executions.length ? (
+                <div className="text-center text-muted" style={{ padding: 24 }}>실행 기록 없음</div>
+              ) : (
+                <div>
+                  {dash.recent_executions.map((e, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                      <span className="text-sm text-muted" style={{ width: 90, flexShrink: 0 }}>
+                        {new Date(e.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span style={{ fontWeight: 600, width: 70, flexShrink: 0 }}>{e.user_id}</span>
+                      <span className="text-sm" style={{ marginRight: 6 }}>{decodeName(e.user_name)}</span>
+                      <span className="badge badge-info">{e.menu}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── 작업 이력 ── */}
       {activeTab === "history" && (
         <>
           <div className="card">
             <div className="flex gap-3" style={{ flexWrap: "wrap", alignItems: "end" }}>
-              <div>
-                <label className="text-sm text-muted">시작일</label>
-                <input type="date" className="input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm text-muted">종료일</label>
-                <input type="date" className="input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm text-muted">사용자 ID</label>
-                <input className="input" placeholder="전체" value={filterUser} onChange={(e) => setFilterUser(e.target.value)} />
-              </div>
-              <div style={{ paddingTop: 20 }}>
+              <div><label className="text-sm text-muted">시작일</label>
+                <input type="date" className="input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
+              <div><label className="text-sm text-muted">종료일</label>
+                <input type="date" className="input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+              <div><label className="text-sm text-muted">직번</label>
+                <input className="input" placeholder="전체" value={filterUser} onChange={(e) => setFilterUser(e.target.value)} /></div>
+              <div><label className="text-sm text-muted">이름</label>
+                <input className="input" placeholder="전체" value={filterName} onChange={(e) => setFilterName(e.target.value)} /></div>
+              <div style={{ paddingTop: 20, display: "flex", gap: 8 }}>
                 <button className="btn btn-primary" onClick={() => { setPage(1); fetchHistory(); }}>조회</button>
+                <button className="btn btn-secondary" onClick={() => downloadCsv(
+                  ["시간", "직번", "이름", "메뉴", "작업", "상세"],
+                  items.map(it => [formatDate(it.timestamp), it.user_id, decodeName(it.user_name), it.menu, it.action, it.detail])
+                , `작업이력_${dateFrom}_${dateTo}.csv`)}>CSV</button>
               </div>
             </div>
           </div>
 
           <div className="card">
-            <div className="flex-between mb-3">
-              <span className="text-sm text-muted">총 {total}건</span>
-            </div>
+            <div className="flex-between mb-3"><span className="text-sm text-muted">총 {total}건</span></div>
             {loading ? (
               <div className="text-center text-muted" style={{ padding: 40 }}>조회 중...</div>
             ) : items.length === 0 ? (
@@ -254,9 +291,7 @@ export default function HistoryPage() {
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table className="table-preview">
-                  <thead>
-                    <tr><th>시간</th><th>사용자 ID</th><th>이름</th><th>메뉴</th><th>작업</th><th>상세</th></tr>
-                  </thead>
+                  <thead><tr><th>시간</th><th>직번</th><th>이름</th><th>메뉴</th><th>작업</th><th>상세</th></tr></thead>
                   <tbody>
                     {items.map((item, i) => (
                       <tr key={i}>
@@ -283,17 +318,16 @@ export default function HistoryPage() {
         </>
       )}
 
-      {/* ── 토큰 사용량 탭 ── */}
+      {/* ── 토큰 사용량 ── */}
       {activeTab === "tokens" && (
         <>
+          {/* 월별 */}
           <div className="card">
             <div className="flex-between mb-3">
               <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>월별 사용량</div>
               <div className="flex gap-2" style={{ alignItems: "center" }}>
                 <select className="select" value={tokenYear} onChange={(e) => setTokenYear(e.target.value)}>
-                  {[2024, 2025, 2026, 2027].map((y) => (
-                    <option key={y} value={y}>{y}년</option>
-                  ))}
+                  {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}년</option>)}
                 </select>
                 <button className="btn btn-primary btn-sm" onClick={fetchTokenSummary}>조회</button>
               </div>
@@ -303,36 +337,21 @@ export default function HistoryPage() {
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table className="table-preview">
-                  <thead>
-                    <tr>
-                      <th>월</th><th>요청 수</th><th>사용자</th>
-                      <th>입력 토큰</th><th>출력 토큰</th><th>합계 토큰</th>
-                      <th>추정 비용 (USD)</th><th>추정 비용 (KRW)</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>월</th><th>요청 수</th><th>사용자</th><th>입력 토큰</th><th>출력 토큰</th><th>합계 토큰</th><th>추정 비용 (USD)</th><th>추정 비용 (KRW)</th></tr></thead>
                   <tbody>
                     {tokenMonths.map((m) => {
                       const cost = calcCost(m.input_tokens, m.output_tokens);
                       return (
                         <tr key={m.month}>
-                          <td>{m.month}</td>
-                          <td>{fmtNum(m.requests)}</td>
-                          <td>{m.unique_users}</td>
-                          <td>{fmtNum(m.input_tokens)}</td>
-                          <td>{fmtNum(m.output_tokens)}</td>
+                          <td>{m.month}</td><td>{fmtNum(m.requests)}</td><td>{m.unique_users}</td>
+                          <td>{fmtNum(m.input_tokens)}</td><td>{fmtNum(m.output_tokens)}</td>
                           <td>{fmtNum(m.input_tokens + m.output_tokens)}</td>
-                          <td>${cost.usd.toFixed(3)}</td>
-                          <td>₩{fmtNum(Math.round(cost.krw))}</td>
+                          <td>${cost.usd.toFixed(3)}</td><td>₩{fmtNum(Math.round(cost.krw))}</td>
                         </tr>
                       );
                     })}
                     {tokenMonths.length > 1 && (() => {
-                      const tot = tokenMonths.reduce((a, m) => ({
-                        requests: a.requests + m.requests,
-                        input_tokens: a.input_tokens + m.input_tokens,
-                        output_tokens: a.output_tokens + m.output_tokens,
-                        unique_users: 0,
-                      }), { requests: 0, input_tokens: 0, output_tokens: 0, unique_users: 0 });
+                      const tot = tokenMonths.reduce((a, m) => ({ requests: a.requests + m.requests, input_tokens: a.input_tokens + m.input_tokens, output_tokens: a.output_tokens + m.output_tokens, unique_users: 0 }), { requests: 0, input_tokens: 0, output_tokens: 0, unique_users: 0 });
                       const c = calcCost(tot.input_tokens, tot.output_tokens);
                       return (
                         <tr style={{ fontWeight: 700, background: "var(--primary-light)" }}>
@@ -352,50 +371,53 @@ export default function HistoryPage() {
             </p>
           </div>
 
+          {/* 상세 조회 */}
           <div className="card">
             <div className="card-header">상세 조회</div>
-            <div className="flex gap-3 mb-3" style={{ flexWrap: "wrap", alignItems: "end" }}>
-              <div>
-                <label className="text-sm text-muted">시작일</label>
-                <input type="date" className="input" value={tokenDateFrom} onChange={(e) => setTokenDateFrom(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm text-muted">종료일</label>
-                <input type="date" className="input" value={tokenDateTo} onChange={(e) => setTokenDateTo(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm text-muted">사용자</label>
-                <input className="input" placeholder="전체" value={tokenFilterUser} onChange={(e) => setTokenFilterUser(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm text-muted">메뉴</label>
+
+            {/* 필터 */}
+            <div className="flex gap-3 mb-4" style={{ flexWrap: "wrap", alignItems: "end" }}>
+              <div><label className="text-sm text-muted">시작일</label>
+                <input type="date" className="input" value={tokenDateFrom} onChange={(e) => setTokenDateFrom(e.target.value)} /></div>
+              <div><label className="text-sm text-muted">종료일</label>
+                <input type="date" className="input" value={tokenDateTo} onChange={(e) => setTokenDateTo(e.target.value)} /></div>
+              <div><label className="text-sm text-muted">직번</label>
+                <input className="input" placeholder="전체" value={tokenFilterUser} onChange={(e) => setTokenFilterUser(e.target.value)} /></div>
+              <div><label className="text-sm text-muted">메뉴</label>
                 <select className="select" value={tokenFilterMenu} onChange={(e) => setTokenFilterMenu(e.target.value)}>
                   <option value="">전체</option>
                   <option value="내용추출">내용추출</option>
                   <option value="표추출">표추출</option>
                   <option value="요약">요약</option>
                   <option value="번역">번역</option>
-                </select>
-              </div>
-              <div style={{ paddingTop: 20 }}>
+                </select></div>
+              <div style={{ paddingTop: 20, display: "flex", gap: 8 }}>
                 <button className="btn btn-primary" onClick={() => { setTokenPage(1); fetchTokenDetail(); }}>조회</button>
+                <button className="btn btn-secondary" onClick={() => downloadCsv(
+                  ["시간", "직번", "이름", "메뉴", "파일", "페이지", "입력토큰", "출력토큰", "비용(USD)"],
+                  tokenItems.map(e => { const c = calcCost(e.input_tokens, e.output_tokens); return [formatDate(e.timestamp), e.user_id, decodeName(e.user_name), e.menu, e.filename, e.page === -1 ? "전체" : e.page, e.input_tokens, e.output_tokens, c.usd.toFixed(4)]; })
+                , `토큰사용량_${tokenDateFrom}_${tokenDateTo}.csv`)}>CSV</button>
               </div>
             </div>
 
+            {/* 결과 요약 배너 */}
             {tokenTotal > 0 && (
-              <div className="flex gap-3 mb-3" style={{ flexWrap: "wrap" }}>
-                {[
-                  { label: "총 요청", value: fmtNum(tokenTotal) + "건" },
-                  { label: "입력 토큰", value: fmtNum(tokenTotalInput) },
-                  { label: "출력 토큰", value: fmtNum(tokenTotalOutput) },
-                  { label: "추정 비용", value: `$${totalCost.usd.toFixed(2)} / ₩${fmtNum(Math.round(totalCost.krw))}` },
-                ].map((s) => (
-                  <div key={s.label} style={{ background: "var(--bg-secondary, #f8f9fa)", borderLeft: "3px solid var(--primary)", borderRadius: "var(--radius)", padding: "12px 18px", minWidth: 140 }}>
-                    <div className="text-sm text-muted">{s.label}</div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{s.value}</div>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div style={{ borderTop: "1px solid var(--border)", marginBottom: 16 }} />
+                <div className="flex gap-3 mb-3" style={{ flexWrap: "wrap" }}>
+                  {[
+                    { label: "총 요청", value: fmtNum(tokenTotal) + "건", color: "#2563eb" },
+                    { label: "입력 토큰", value: fmtNum(tokenTotalInput), color: "#16a34a" },
+                    { label: "출력 토큰", value: fmtNum(tokenTotalOutput), color: "#9333ea" },
+                    { label: "추정 비용", value: `$${totalCost.usd.toFixed(2)} / ₩${fmtNum(Math.round(totalCost.krw))}`, color: "#ea580c" },
+                  ].map((s) => (
+                    <div key={s.label} style={{ background: "var(--bg-secondary, #f8f9fa)", borderLeft: `3px solid ${s.color}`, borderRadius: "var(--radius)", padding: "10px 16px", minWidth: 140 }}>
+                      <div className="text-sm text-muted">{s.label}</div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: s.color }}>{s.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
 
             {tokenLoading ? (
@@ -405,25 +427,18 @@ export default function HistoryPage() {
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table className="table-preview">
-                  <thead>
-                    <tr>
-                      <th>시간</th><th>사용자 ID</th><th>이름</th><th>메뉴</th><th>파일</th><th>페이지</th>
-                      <th>입력</th><th>출력</th><th>비용(USD)</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>시간</th><th>직번</th><th>이름</th><th>메뉴</th><th>파일</th><th>페이지</th><th>입력</th><th>출력</th><th>비용(USD)</th></tr></thead>
                   <tbody>
                     {tokenItems.map((e, i) => {
                       const c = calcCost(e.input_tokens, e.output_tokens);
                       return (
                         <tr key={i}>
                           <td className="text-sm">{formatDate(e.timestamp)}</td>
-                          <td>{e.user_id}</td>
-                          <td>{decodeName(e.user_name)}</td>
+                          <td>{e.user_id}</td><td>{decodeName(e.user_name)}</td>
                           <td><span className="badge badge-info">{e.menu}</span></td>
                           <td className="text-sm">{e.filename}</td>
                           <td>{e.page === -1 ? "전체" : e.page}</td>
-                          <td>{fmtNum(e.input_tokens)}</td>
-                          <td>{fmtNum(e.output_tokens)}</td>
+                          <td>{fmtNum(e.input_tokens)}</td><td>{fmtNum(e.output_tokens)}</td>
                           <td>${c.usd.toFixed(4)}</td>
                         </tr>
                       );
@@ -432,7 +447,6 @@ export default function HistoryPage() {
                 </table>
               </div>
             )}
-
             {tokenTotal > 50 && (
               <div className="flex-center gap-2 mt-3" style={{ justifyContent: "center" }}>
                 <button className="btn btn-secondary btn-sm" disabled={tokenPage <= 1} onClick={() => setTokenPage(tokenPage - 1)}>이전</button>
@@ -444,19 +458,15 @@ export default function HistoryPage() {
         </>
       )}
 
-      {/* ── 방문 통계 탭 ── */}
+      {/* ── 방문자 로그 ── */}
       {activeTab === "visitors" && (
         <>
           <div className="card">
             <div className="flex gap-3" style={{ flexWrap: "wrap", alignItems: "end" }}>
-              <div>
-                <label className="text-sm text-muted">시작일</label>
-                <input type="date" className="input" value={visitorDateFrom} onChange={(e) => setVisitorDateFrom(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm text-muted">종료일</label>
-                <input type="date" className="input" value={visitorDateTo} onChange={(e) => setVisitorDateTo(e.target.value)} />
-              </div>
+              <div><label className="text-sm text-muted">시작일</label>
+                <input type="date" className="input" value={visitorDateFrom} onChange={(e) => setVisitorDateFrom(e.target.value)} /></div>
+              <div><label className="text-sm text-muted">종료일</label>
+                <input type="date" className="input" value={visitorDateTo} onChange={(e) => setVisitorDateTo(e.target.value)} /></div>
               <div style={{ paddingTop: 20 }}>
                 <button className="btn btn-primary" onClick={fetchVisitors}>조회</button>
               </div>
@@ -467,63 +477,59 @@ export default function HistoryPage() {
             <div className="card text-center text-muted" style={{ padding: 40 }}>조회 중...</div>
           ) : visitorData ? (
             <>
-              <div className="flex gap-3 mb-4" style={{ flexWrap: "wrap" }}>
+              {/* KPI */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16, margin: "0 0 16px" }}>
                 {[
-                  { label: "총 방문 횟수", value: fmtNum(visitorData.total_visits) + "회" },
-                  { label: "순 방문자 수", value: fmtNum(visitorData.unique_users) + "명" },
+                  { label: "총 방문 횟수", value: fmtNum(visitorData.total_visits) + "회", color: "#2563eb" },
+                  { label: "순 방문자 수", value: fmtNum(visitorData.unique_users) + "명", color: "#16a34a" },
                 ].map((s) => (
-                  <div key={s.label} style={{ background: "var(--bg-secondary, #f8f9fa)", borderLeft: "3px solid var(--primary)", borderRadius: "var(--radius)", padding: "12px 18px", minWidth: 160 }}>
-                    <div className="text-sm text-muted">{s.label}</div>
-                    <div style={{ fontWeight: 700, fontSize: 18 }}>{s.value}</div>
+                  <div key={s.label} style={statCard(s.color)}>
+                    <div className="text-sm text-muted" style={{ marginBottom: 8 }}>{s.label}</div>
+                    <div style={{ fontSize: 32, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
                   </div>
                 ))}
               </div>
 
-              <div className="card">
-                <div className="card-header">일별 방문 현황</div>
-                <div style={{ overflowX: "auto" }}>
-                  <table className="table-preview">
-                    <thead>
-                      <tr><th>날짜</th><th>총 방문</th><th>순 방문자</th><th>방문자 목록</th></tr>
-                    </thead>
-                    <tbody>
-                      {visitorData.daily.map((d) => (
-                        <tr key={d.date}>
-                          <td>{d.date}</td>
-                          <td>{fmtNum(d.total_visits)}</td>
-                          <td>{d.unique_users}</td>
-                          <td className="text-sm text-muted">
-                            {d.users.map((u) => decodeName(u.user_name) || u.user_id).join(", ") || "-"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {visitorData.top_users.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div className="card">
-                  <div className="card-header">사용자별 방문 횟수</div>
+                  <div className="card-header">일별 방문 현황</div>
                   <div style={{ overflowX: "auto" }}>
                     <table className="table-preview">
-                      <thead>
-                        <tr><th>순위</th><th>사용자 ID</th><th>이름</th><th>방문 횟수</th></tr>
-                      </thead>
+                      <thead><tr><th>날짜</th><th>총 방문</th><th>순 방문자</th><th>방문자</th></tr></thead>
                       <tbody>
-                        {visitorData.top_users.map((u, i) => (
-                          <tr key={u.user_id}>
-                            <td>{i + 1}</td>
-                            <td>{u.user_id}</td>
-                            <td>{decodeName(u.user_name)}</td>
-                            <td>{fmtNum(u.visits)}회</td>
+                        {visitorData.daily.map((d) => (
+                          <tr key={d.date}>
+                            <td>{d.date}</td>
+                            <td>{fmtNum(d.total_visits)}</td>
+                            <td>{d.unique_users}</td>
+                            <td className="text-sm text-muted">{d.users.map((u) => decodeName(u.user_name) || u.user_id).join(", ") || "-"}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
-              )}
+
+                <div className="card">
+                  <div className="card-header">사용자별 방문 횟수</div>
+                  {visitorData.top_users.length === 0 ? (
+                    <div className="text-center text-muted" style={{ padding: 24 }}>데이터 없음</div>
+                  ) : (
+                    <table className="table-preview">
+                      <thead><tr><th>순위</th><th>직번</th><th>이름</th><th>방문</th></tr></thead>
+                      <tbody>
+                        {visitorData.top_users.map((u, i) => (
+                          <tr key={u.user_id}>
+                            <td>{i + 1}</td><td>{u.user_id}</td>
+                            <td>{decodeName(u.user_name)}</td>
+                            <td>{fmtNum(u.visits)}회</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
             </>
           ) : (
             <div className="card text-center text-muted" style={{ padding: 40 }}>조회 버튼을 눌러 통계를 확인하세요.</div>
@@ -531,7 +537,7 @@ export default function HistoryPage() {
         </>
       )}
 
-      {/* ── 관리자 관리 탭 ── */}
+      {/* ── 권한 관리 ── */}
       {activeTab === "users" && <AdminManager />}
     </div>
   );
@@ -550,10 +556,7 @@ function AdminManager() {
       const res = await fetch(`${BACKEND}/api/admin/users`, { credentials: "include" });
       const data = await res.json();
       setAdmins(data.admins || []);
-    } catch {
-    } finally {
-      setLoading(false);
-    }
+    } catch {} finally { setLoading(false); }
   }, [BACKEND]);
 
   useEffect(() => { load(); }, [load]);
@@ -565,9 +568,7 @@ function AdminManager() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: newId.trim() }),
     });
-    setMsg(`${newId} 관리자 추가 완료`);
-    setNewId("");
-    load();
+    setMsg(`${newId} 관리자 추가 완료`); setNewId(""); load();
   };
 
   const removeAdmin = async (uid: string) => {
@@ -577,8 +578,7 @@ function AdminManager() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: uid }),
     });
-    setMsg(`${uid} 삭제 완료`);
-    load();
+    setMsg(`${uid} 삭제 완료`); load();
   };
 
   return (
@@ -586,19 +586,11 @@ function AdminManager() {
       <div className="card">
         <div className="card-header">관리자 추가</div>
         <div className="flex gap-3" style={{ alignItems: "end" }}>
-          <div>
-            <label className="text-sm text-muted">사용자 ID (사번)</label>
-            <input
-              className="input"
-              placeholder="예: 162264"
-              value={newId}
+          <div><label className="text-sm text-muted">직번 (사용자 ID)</label>
+            <input className="input" placeholder="예: 162264" value={newId}
               onChange={(e) => setNewId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addAdmin()}
-            />
-          </div>
-          <div style={{ paddingTop: 20 }}>
-            <button className="btn btn-primary" onClick={addAdmin}>추가</button>
-          </div>
+              onKeyDown={(e) => e.key === "Enter" && addAdmin()} /></div>
+          <div style={{ paddingTop: 20 }}><button className="btn btn-primary" onClick={addAdmin}>추가</button></div>
         </div>
         {msg && <p className="text-sm" style={{ color: "var(--success)", marginTop: 8 }}>{msg}</p>}
       </div>
@@ -607,20 +599,16 @@ function AdminManager() {
         <div className="card-header">관리자 목록</div>
         {loading ? <div className="text-muted text-sm" style={{ padding: 16 }}>불러오는 중...</div> : (
           <table className="table-preview">
-            <thead><tr><th>사용자 ID</th><th>권한</th><th>관리</th></tr></thead>
+            <thead><tr><th>직번</th><th>권한</th><th>관리</th></tr></thead>
             <tbody>
               {admins.map((uid) => (
                 <tr key={uid}>
                   <td>{uid}</td>
                   <td><span className="badge badge-info">관리자</span></td>
-                  <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => removeAdmin(uid)}>삭제</button>
-                  </td>
+                  <td><button className="btn btn-secondary btn-sm" onClick={() => removeAdmin(uid)}>삭제</button></td>
                 </tr>
               ))}
-              {admins.length === 0 && (
-                <tr><td colSpan={3} className="text-center text-muted" style={{ padding: 24 }}>등록된 관리자 없음</td></tr>
-              )}
+              {admins.length === 0 && <tr><td colSpan={3} className="text-center text-muted" style={{ padding: 24 }}>등록된 관리자 없음</td></tr>}
             </tbody>
           </table>
         )}
