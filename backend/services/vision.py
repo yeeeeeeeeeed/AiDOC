@@ -74,42 +74,62 @@ def call_vision_multi(images: list[bytes], system_prompt: str, user_prompt: str,
     return response.choices[0].message.content.strip()
 
 
+def _extract_balanced(content: str, open_ch: str, close_ch: str, start: int) -> str | None:
+    """start 위치부터 괄호 균형 맞는 문자열 추출"""
+    depth = 0
+    for i in range(start, len(content)):
+        if content[i] == open_ch:
+            depth += 1
+        elif content[i] == close_ch:
+            depth -= 1
+        if depth == 0:
+            return content[start:i + 1]
+    return None
+
+
 def parse_tables_json(content: str) -> list:
     """LLM 응답에서 tables JSON 배열 추출"""
     content = content.strip()
 
+    # 마크다운 코드블록 벗기기
     m = re.search(r'```(?:json)?\s*\n?(.*?)```', content, re.DOTALL)
     if m:
         content = m.group(1).strip()
 
+    # { "tables": [...] } 형식
     start = content.find('{')
     if start >= 0:
-        depth = 0
-        end = start
-        for i in range(start, len(content)):
-            if content[i] == '{':
-                depth += 1
-            elif content[i] == '}':
-                depth -= 1
-            if depth == 0:
-                end = i + 1
-                break
-        try:
-            parsed = json.loads(content[start:end])
-            if "tables" in parsed:
-                return parsed["tables"]
-            if "headers" in parsed and "rows" in parsed:
-                return [parsed]
-        except json.JSONDecodeError:
-            pass
+        chunk = _extract_balanced(content, '{', '}', start)
+        if chunk:
+            try:
+                parsed = json.loads(chunk)
+                if "tables" in parsed:
+                    tables = parsed["tables"]
+                    return tables if tables else []
+                if "headers" in parsed and "rows" in parsed:
+                    return [parsed]
+            except json.JSONDecodeError:
+                pass
 
+    # [ {...}, ... ] 형식
     start = content.find('[')
     if start >= 0:
-        try:
-            parsed = json.loads(content[start:])
-            if isinstance(parsed, list) and parsed and "headers" in parsed[0]:
-                return parsed
-        except json.JSONDecodeError:
-            pass
+        chunk = _extract_balanced(content, '[', ']', start)
+        if chunk:
+            try:
+                parsed = json.loads(chunk)
+                if isinstance(parsed, list):
+                    tables = [t for t in parsed if isinstance(t, dict) and "headers" in t]
+                    if tables:
+                        return tables
+                    if not parsed:
+                        return []
+            except json.JSONDecodeError:
+                pass
+
+    # 표 없음 응답 처리
+    no_table_keywords = ["표가 없", "표 없", "no table", "없습니다", "찾을 수 없"]
+    if any(kw in content.lower() for kw in no_table_keywords):
+        return []
 
     return [{"title": "파싱 실패 (원문)", "headers": ["원문"], "rows": [[content[:2000]]]}]
