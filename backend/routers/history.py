@@ -33,7 +33,7 @@ def _save_json_list(filepath: str, data: list):
 
 
 def _get_admins() -> list[str]:
-    return _load_json_list(ADMIN_FILE)
+    return [uid for uid in _load_json_list(ADMIN_FILE) if uid and uid.strip()]
 
 
 def is_admin(request: Request) -> bool:
