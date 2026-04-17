@@ -26,9 +26,9 @@ interface TokenMonth {
   unique_users: number;
 }
 
-// Azure OpenAI GPT-4o 기준 추정 단가 (USD/1M tokens → KRW 환산)
-const PRICE_INPUT_PER_M = 2.5;   // USD
-const PRICE_OUTPUT_PER_M = 10.0; // USD
+// Azure OpenAI gpt-5.4-mini 기준 추정 단가 (USD/1M tokens → KRW 환산)
+const PRICE_INPUT_PER_M = 0.15;  // USD
+const PRICE_OUTPUT_PER_M = 0.60; // USD
 const USD_TO_KRW = 1380;
 
 function calcCost(input: number, output: number) {
@@ -301,7 +301,7 @@ export default function HistoryPage() {
               </div>
             )}
             <p className="text-sm text-muted" style={{ marginTop: 8 }}>
-              * GPT-4o 기준 추정치: 입력 $2.50/1M · 출력 $10.00/1M · 환율 ₩1,380/USD
+              * gpt-5.4-mini 기준 추정치: 입력 $0.15/1M · 출력 $0.60/1M · 환율 ₩1,380/USD
             </p>
           </div>
 
@@ -331,7 +331,9 @@ export default function HistoryPage() {
                   <option value="번역">번역</option>
                 </select>
               </div>
-              <button className="btn btn-primary" onClick={() => { setTokenPage(1); fetchTokenDetail(); }}>조회</button>
+              <div style={{ paddingTop: 20 }}>
+                <button className="btn btn-primary" onClick={() => { setTokenPage(1); fetchTokenDetail(); }}>조회</button>
+              </div>
             </div>
 
             {/* 합계 요약 */}
@@ -343,7 +345,7 @@ export default function HistoryPage() {
                   { label: "출력 토큰", value: fmtNum(tokenTotalOutput) },
                   { label: "추정 비용", value: `$${totalCost.usd.toFixed(2)} / ₩${fmtNum(Math.round(totalCost.krw))}` },
                 ].map((s) => (
-                  <div key={s.label} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "8px 16px", minWidth: 120 }}>
+                  <div key={s.label} style={{ background: "var(--bg-secondary, #f8f9fa)", borderLeft: "3px solid var(--primary)", borderRadius: "var(--radius)", padding: "12px 18px", minWidth: 140 }}>
                     <div className="text-sm text-muted">{s.label}</div>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{s.value}</div>
                   </div>

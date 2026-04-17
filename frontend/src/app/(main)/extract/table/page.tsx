@@ -7,7 +7,7 @@ import PageSelector from "@/components/ui/PageSelector";
 import ProgressStream from "@/components/ui/ProgressStream";
 import TableEditor from "@/components/ui/TableEditor";
 import api, { createSSEConnection, drmDownload } from "@/lib/api";
-import { saveSession, loadSession, clearSession, saveThumbs, loadThumbs } from "@/lib/session";
+import { saveSession, loadSession, clearSession, saveThumbs, loadThumbs, saveResult, loadResult } from "@/lib/session";
 import type { UploadResult, StreamEvent, TableData, FileItem, StepStatus } from "@/types";
 
 const SESSION_KEY = "table";
@@ -41,6 +41,8 @@ function TableExtractInner() {
         setUpload({ job_id: jobId, filename: data.filename, page_count: data.page_count, thumbnails: thumbs });
         setSelectedPages(Array.from({ length: data.page_count }, (_, i) => i + 1));
         saveSession(SESSION_KEY, { job_id: jobId, filename: data.filename, page_count: data.page_count });
+        const saved = loadResult<TableData[]>(SESSION_KEY);
+        if (saved && saved.length > 0) setTables(saved);
       })
       .catch(() => clearSession(SESSION_KEY));
   }, [searchParams]);
@@ -74,6 +76,7 @@ function TableExtractInner() {
           if (data.steps) setSteps(data.steps);
           if (data.tables) {
             setTables(data.tables);
+            saveResult(SESSION_KEY, data.tables);
             setProcessing(false);
           }
         },

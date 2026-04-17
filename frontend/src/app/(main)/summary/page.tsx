@@ -6,7 +6,7 @@ import PdfUploader from "@/components/ui/PdfUploader";
 import PageSelector from "@/components/ui/PageSelector";
 import MarkdownView from "@/components/ui/MarkdownView";
 import api, { createSSEConnection, drmDownload } from "@/lib/api";
-import { saveSession, loadSession, clearSession, saveThumbs, loadThumbs } from "@/lib/session";
+import { saveSession, loadSession, clearSession, saveThumbs, loadThumbs, saveResult, loadResult } from "@/lib/session";
 import type { UploadResult, StreamEvent, FileItem } from "@/types";
 
 const SESSION_KEY = "summary";
@@ -40,6 +40,8 @@ function SummaryInner() {
         setUpload({ job_id: jobId, filename: data.filename, page_count: data.page_count, thumbnails: thumbs });
         setSelectedPages(Array.from({ length: data.page_count }, (_, i) => i + 1));
         saveSession(SESSION_KEY, { job_id: jobId, filename: data.filename, page_count: data.page_count });
+        const saved = loadResult<string>(SESSION_KEY);
+        if (saved) setSummary(saved);
       })
       .catch(() => clearSession(SESSION_KEY));
   }, [searchParams]);
@@ -73,6 +75,7 @@ function SummaryInner() {
           setProgress(data.progress);
           if (data.result) {
             setSummary(data.result);
+            saveResult(SESSION_KEY, data.result);
             setProcessing(false);
           }
         },
