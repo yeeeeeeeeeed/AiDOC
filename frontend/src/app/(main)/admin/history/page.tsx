@@ -49,7 +49,11 @@ function lastWeek() {
 
 function decodeName(name?: string): string {
   if (!name) return "";
-  try { return decodeURIComponent(name); } catch { return name; }
+  let v = name;
+  for (let i = 0; i < 5; i++) {
+    try { const d = decodeURIComponent(v); if (d === v) break; v = d; } catch { break; }
+  }
+  return v;
 }
 
 function downloadCsv(headers: string[], rows: (string | number)[][], filename: string) {

@@ -36,7 +36,11 @@ export default function Sidebar() {
       .then((data: AccessCheck) => {
         setAccess(data);
         if (data.user_name) {
-          try { setUserName(decodeURIComponent(data.user_name)); } catch { setUserName(data.user_name); }
+          let v = data.user_name;
+          for (let i = 0; i < 5; i++) {
+            try { const d = decodeURIComponent(v); if (d === v) break; v = d; } catch { break; }
+          }
+          setUserName(v);
         }
       })
       .catch(() => {});
