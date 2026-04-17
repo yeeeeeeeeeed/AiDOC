@@ -45,28 +45,47 @@ def is_allowed_user(request: Request) -> bool:
     return True  # 모든 SSO 인증 사용자 허용
 
 
-_SKIP_PATHS = {"/api/admin/check", "/health", "/api/health"}
+_SKIP_PATHS = {"/health", "/api/health"}
+_VISIT_DEDUP_MINUTES = 25  # 세션 30분 갱신보다 짧게 — 실제 재방문만 기록
 
 def log_visitor(request: Request):
-    """방문자 로그 기록 (세션 체크·헬스체크 제외)"""
+    """방문자 로그 기록.
+    /api/admin/check 는 페이지 로드 시그널로 사용하되,
+    25분 이내 동일 사용자 중복 기록은 건너뜀 (세션 자동 갱신 제외).
+    """
     path = str(request.url.path)
     if any(path.endswith(s) for s in _SKIP_PATHS):
         return
+
+    is_check = path.endswith("/api/admin/check")
+
     user_id = request.cookies.get("AXI-USER-ID", "")
     if not user_id:
         return
-    today = datetime.now().strftime("%Y-%m-%d")
+
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
     log_file = os.path.join(VISITOR_LOG_DIR, f"{today}.json")
+    visitors = _load_json_list(log_file) if os.path.exists(log_file) else []
+
+    # check 요청은 25분 이내 동일 사용자 기록이 있으면 스킵
+    if is_check:
+        cutoff = (now - timedelta(minutes=_VISIT_DEDUP_MINUTES)).isoformat()
+        recently_logged = any(
+            v.get("user_id") == user_id and v.get("timestamp", "") >= cutoff
+            for v in visitors
+        )
+        if recently_logged:
+            return
 
     ip = request.client.host if request.client else ""
-    visitors = _load_json_list(log_file) if os.path.exists(log_file) else []
     entry = {
         "user_id": user_id,
         "user_name": request.cookies.get("AXI-USER-NAME", ""),
         "ip": ip,
         "path": path,
         "method": request.method,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": now.isoformat(),
     }
     visitors.append(entry)
     _save_json_list(log_file, visitors)
