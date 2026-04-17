@@ -44,7 +44,23 @@ export function clearSession(key: string) {
   try {
     localStorage.removeItem(`aidoc_${key}`);
     sessionStorage.removeItem(`aidoc_thumbs_${key}`);
+    sessionStorage.removeItem(`aidoc_result_${key}`);
   } catch {}
+}
+
+export function saveResult(key: string, data: unknown) {
+  try {
+    sessionStorage.setItem(`aidoc_result_${key}`, JSON.stringify(data));
+  } catch {}
+}
+
+export function loadResult<T>(key: string): T | null {
+  try {
+    const raw = sessionStorage.getItem(`aidoc_result_${key}`);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function saveThumbs(key: string, thumbnails: string[]) {

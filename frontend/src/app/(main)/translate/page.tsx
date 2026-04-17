@@ -7,7 +7,7 @@ import PageSelector from "@/components/ui/PageSelector";
 import ProgressStream from "@/components/ui/ProgressStream";
 import MarkdownView from "@/components/ui/MarkdownView";
 import api, { createSSEConnection, drmDownload } from "@/lib/api";
-import { saveSession, loadSession, clearSession, saveThumbs, loadThumbs } from "@/lib/session";
+import { saveSession, loadSession, clearSession, saveThumbs, loadThumbs, saveResult, loadResult } from "@/lib/session";
 import type { UploadResult, StreamEvent, FileItem, StepStatus } from "@/types";
 
 const SESSION_KEY = "translate";
@@ -85,6 +85,8 @@ function TranslateInner() {
         setUpload({ job_id: jobId, filename: data.filename, page_count: data.page_count, thumbnails: thumbs });
         setSelectedPages(Array.from({ length: data.page_count }, (_, i) => i + 1));
         saveSession(SESSION_KEY, { job_id: jobId, filename: data.filename, page_count: data.page_count });
+        const saved = loadResult<Record<string, string>>(SESSION_KEY);
+        if (saved && Object.keys(saved).length > 0) setTranslatePages(saved);
       })
       .catch(() => clearSession(SESSION_KEY));
   }, [searchParams]);
@@ -120,6 +122,7 @@ function TranslateInner() {
           if (data.steps) setSteps(data.steps);
           if (data.translate_pages) {
             setTranslatePages(data.translate_pages);
+            saveResult(SESSION_KEY, data.translate_pages);
             setProcessing(false);
           }
         },

@@ -7,7 +7,7 @@ import PageSelector from "@/components/ui/PageSelector";
 import ProgressStream from "@/components/ui/ProgressStream";
 import MarkdownView from "@/components/ui/MarkdownView";
 import api, { createSSEConnection, drmDownload } from "@/lib/api";
-import { saveSession, loadSession, clearSession, saveThumbs, loadThumbs } from "@/lib/session";
+import { saveSession, loadSession, clearSession, saveThumbs, loadThumbs, saveResult, loadResult } from "@/lib/session";
 import type { UploadResult, StreamEvent, FileItem, StepStatus } from "@/types";
 
 const SESSION_KEY = "content";
@@ -42,6 +42,9 @@ function ContentExtractInner() {
         setUpload({ job_id: jobId, filename: data.filename, page_count: data.page_count, thumbnails: thumbs });
         setSelectedPages(Array.from({ length: data.page_count }, (_, i) => i + 1));
         saveSession(SESSION_KEY, { job_id: jobId, filename: data.filename, page_count: data.page_count });
+        // 이전 추출 결과 복원
+        const saved = loadResult<Record<string, string>>(SESSION_KEY);
+        if (saved && Object.keys(saved).length > 0) setContentPages(saved);
       })
       .catch(() => clearSession(SESSION_KEY));
   }, [searchParams]);
@@ -75,6 +78,7 @@ function ContentExtractInner() {
           if (data.steps) setSteps(data.steps);
           if (data.content_pages) {
             setContentPages(data.content_pages);
+            saveResult(SESSION_KEY, data.content_pages);
             setProcessing(false);
           }
         },
