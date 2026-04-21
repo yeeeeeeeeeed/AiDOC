@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<title>AiDoc — Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#f0eee9;overflow:hidden;height:100%;font-family:"Pretendard",-apple-system,sans-serif;}
+  *{box-sizing:border-box;}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="aidoc-screens.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="aidoc" title="AiDoc · 리디자인" subtitle="기존 기업용 톤 유지, 트렌디하게 리프레시 — Pretendard · 인디고 액센트 · 부드러운 뉴트럴">
+        <DCArtboard id="home" label="홈 · 대시보드" width={1320} height={860}>
+          <HomeScreen/>
+        </DCArtboard>
+        <DCArtboard id="summary" label="문서 요약" width={1320} height={860}>
+          <SummaryScreen/>
+        </DCArtboard>
+        <DCArtboard id="compare" label="PDF 비교" width={1320} height={860}>
+          <CompareScreen/>
+        </DCArtboard>
+        <DCArtboard id="table" label="표 추출" width={1320} height={860}>
+          <TableScreen/>
+        </DCArtboard>
+        <DCArtboard id="translate" label="번역" width={1320} height={860}>
+          <TranslateScreen/>
+        </DCArtboard>
+        <DCArtboard id="admin-tokens" label="관리자 · 토큰 사용량" width={1320} height={1040}>
+          <AdminTokensScreen/>
+        </DCArtboard>
+        <DCArtboard id="admin-visitors" label="관리자 · 방문자 로그" width={1320} height={980}>
+          <AdminVisitorsScreen/>
+        </DCArtboard>
+        <DCArtboard id="admin-limits" label="관리자 · 사용 한도" width={1320} height={1100}>
+          <AdminLimitsScreen/>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

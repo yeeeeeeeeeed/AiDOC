@@ -38,7 +38,7 @@ const LANGUAGES = [
   { value: "auto", label: "자동 감지" },
   { value: "en", label: "영어" },
   { value: "ja", label: "일본어" },
-  { value: "zh-CN", label: "중국어 (간체, 중국 본토)" },
+  { value: "zh-CN", label: "중국어 (간체)" },
   { value: "zh-TW", label: "중국어 (번체, 대만)" },
   { value: "zh-HK", label: "중국어 (번체, 홍콩)" },
   { value: "vi", label: "베트남어" },
@@ -53,6 +53,28 @@ const LANGUAGES = [
   { value: "es", label: "스페인어" },
   { value: "ru", label: "러시아어" },
 ];
+
+function LangPill({ code, name, active }: { code: string; name: string; active?: boolean }) {
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 10px",
+        borderRadius: 999,
+        background: active ? "#EEF1FF" : "#F3F2EC",
+        color: active ? "#2740C7" : "#4A5259",
+        fontSize: 12,
+      }}
+    >
+      <span style={{ fontWeight: 600, fontFamily: `"JetBrains Mono", monospace`, fontSize: 10.5, letterSpacing: 0.5 }}>
+        {code}
+      </span>
+      <span>{name}</span>
+    </div>
+  );
+}
 
 export default function TranslatePage() {
   return <Suspense><TranslateInner /></Suspense>;
@@ -155,112 +177,214 @@ function TranslateInner() {
     }
   };
 
+  const hasResult = Object.keys(translatePages).length > 0;
+  const srcLabel = LANGUAGES.find((l) => l.value === sourceLang)?.label ?? sourceLang;
+  const tgtLabel = TARGET_LANGUAGES.find((l) => l.value === targetLang)?.label ?? targetLang;
+
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>번역</h1>
-      <p className="text-muted mb-4">PDF 문서를 원하는 언어로 번역하여 추출합니다.</p>
+      {/* Page header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: -0.6, margin: 0 }}>번역</h1>
+        <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#EEF1FF", color: "#2740C7", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>AI</span>
+      </div>
+      <p style={{ color: "#8A9199", fontSize: 13.5, marginBottom: 24 }}>PDF 문서를 원하는 언어로 번역하여 추출합니다</p>
 
       {!upload && (
-        <div className="card">
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
           <PdfUploader onUploaded={handleUploaded} />
         </div>
       )}
 
       {upload && (
         <>
-          <div className="card">
-            <div className="flex-between">
-              <div>
-                <span className="font-bold">{upload.filename}</span>
-                <span className="text-muted text-sm" style={{ marginLeft: 12 }}>{upload.page_count}페이지</span>
-              </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => { setUpload(null); setTranslatePages({}); clearSession(SESSION_KEY); }}>
-                다른 파일
-              </button>
-            </div>
-          </div>
-
-          {upload.thumbnails.length > 0 && (
-            <div className="card">
-              <div className="card-header">페이지 선택</div>
-              <PageSelector
-                thumbnails={upload.thumbnails}
-                pageCount={upload.page_count}
-                selectedPages={selectedPages}
-                onSelectionChange={setSelectedPages}
-              />
-            </div>
-          )}
-
-          <div className="card">
-            <div className="card-header">번역 옵션</div>
-            <div className="flex gap-3 mb-3">
-              <div>
-                <label className="text-sm text-muted">원문 언어</label>
-                <select className="select" value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}>
-                  {LANGUAGES.map((l) => (
-                    <option key={l.value} value={l.value}>{l.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-muted">번역 대상 언어</label>
-                <select className="select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
-                  {TARGET_LANGUAGES.map((l) => (
-                    <option key={l.value} value={l.value}>{l.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <textarea
-              className="textarea"
-              placeholder="추가 지시 (선택): 예) 기술 용어는 영문 병기, 표는 원문 유지..."
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-            />
-          </div>
-
-          <button
-            className="btn btn-primary btn-block mb-4"
-            onClick={startTranslate}
-            disabled={processing || selectedPages.length === 0}
+          {/* File + lang bar */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #EBE8E0",
+              borderRadius: 14,
+              padding: "14px 20px",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flexWrap: "wrap",
+            }}
           >
-            {processing ? "번역 중..." : `번역 시작 (${selectedPages.length}페이지)`}
-          </button>
+            <div className="pdf-icon">PDF</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{upload.filename}</div>
+              <div style={{ fontSize: 11.5, color: "#8A9199", marginTop: 2 }}>{upload.page_count}페이지</div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 14px",
+                background: "#FAFAF7",
+                border: "1px solid #EBE8E0",
+                borderRadius: 10,
+                fontSize: 13,
+              }}
+            >
+              <LangPill code={sourceLang.toUpperCase().slice(0, 2)} name={srcLabel} />
+              <span style={{ color: "#8A9199" }}>→</span>
+              <LangPill code={targetLang.toUpperCase().slice(0, 2)} name={tgtLabel} active />
+            </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => { setUpload(null); setTranslatePages({}); clearSession(SESSION_KEY); }}
+            >
+              다른 파일
+            </button>
+          </div>
+
+          {!hasResult && (
+            <>
+              {upload.thumbnails.length > 0 && (
+                <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>페이지 선택</div>
+                    <div style={{ flex: 1 }} />
+                    <div style={{ fontSize: 12, color: "#8A9199" }}>{selectedPages.length}/{upload.page_count} 선택</div>
+                  </div>
+                  <PageSelector
+                    thumbnails={upload.thumbnails}
+                    pageCount={upload.page_count}
+                    selectedPages={selectedPages}
+                    onSelectionChange={setSelectedPages}
+                  />
+                </div>
+              )}
+
+              <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>번역 옵션</div>
+                <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>원문 언어</div>
+                    <select className="select" value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}>
+                      {LANGUAGES.map((l) => (
+                        <option key={l.value} value={l.value}>{l.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      paddingBottom: 2,
+                      color: "#8A9199",
+                      fontSize: 18,
+                    }}
+                  >
+                    →
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>번역 대상 언어</div>
+                    <select className="select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
+                      {TARGET_LANGUAGES.map((l) => (
+                        <option key={l.value} value={l.value}>{l.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>추가 지시 (선택)</div>
+                <textarea
+                  className="textarea"
+                  placeholder="예: 기술 용어는 영문 병기, 표는 원문 유지..."
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  style={{ fontSize: 13 }}
+                />
+              </div>
+
+              <button
+                className="btn btn-accent btn-block"
+                style={{ marginBottom: 16 }}
+                onClick={startTranslate}
+                disabled={processing || selectedPages.length === 0}
+              >
+                {processing ? "번역 중..." : `번역 시작 (${selectedPages.length}페이지)`}
+              </button>
+            </>
+          )}
         </>
       )}
 
       {processing && (
-        <div className="card">
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}>
           <ProgressStream progress={progress} steps={steps} statusText="번역 중..." />
+          <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>전체 진행률</div>
+            <div style={{ flex: 1, height: 6, background: "#F1EEE6", borderRadius: 3, overflow: "hidden" }}>
+              <div
+                style={{
+                  height: "100%",
+                  width: `${progress}%`,
+                  background: "linear-gradient(90deg, #3B5BFF, #7B8EFF)",
+                  borderRadius: 3,
+                  transition: "width 0.3s",
+                }}
+              />
+            </div>
+            <div style={{ fontSize: 12.5, color: "#8A9199", fontFamily: `"JetBrains Mono", monospace` }}>
+              {progress}%
+            </div>
+          </div>
         </div>
       )}
 
-      {error && <div className="card" style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{error}</div>}
+      {error && (
+        <div style={{ background: "#FDEBE7", border: "1px solid #C8321E", borderRadius: 14, padding: 16, color: "#C8321E", fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
 
-      {fullContent && (
-        <div className="card">
-          <div className="flex-between mb-3">
-            <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>
-              번역 결과
-            </div>
-            <div className="flex gap-2">
-              <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(fullContent)}>
-                전체 복사
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={exportDocx}>
-                워드 다운로드
-              </button>
-            </div>
+      {hasResult && (
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden" }}>
+          <div
+            style={{
+              padding: "16px 24px",
+              borderBottom: "1px solid #F1EEE6",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600 }}>번역 결과</div>
+            <LangPill code={tgtLabel.slice(0, 2).toUpperCase()} name={tgtLabel} active />
+            <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#E6F6EE", color: "#0E8F5C", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>완료</span>
+            <div style={{ flex: 1 }} />
+            <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(fullContent)}>
+              ⎘ 복사
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={exportDocx}>
+              ↓ 워드
+            </button>
           </div>
-          {Object.keys(translatePages)
-            .sort((a, b) => Number(a) - Number(b))
-            .map((k) => (
-              <div key={k} style={{ marginBottom: 16 }}>
-                <div className="font-bold mb-2">페이지 {k}</div>
-                <MarkdownView content={translatePages[k]} hideCopy />
-              </div>
-            ))}
+          <div style={{ padding: 24 }}>
+            {Object.keys(translatePages)
+              .sort((a, b) => Number(a) - Number(b))
+              .map((k, idx, arr) => (
+                <div key={k} style={{ marginBottom: 20 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#8A9199",
+                      fontFamily: `"JetBrains Mono", monospace`,
+                      marginBottom: 10,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    PAGE {k}
+                  </div>
+                  <MarkdownView content={translatePages[k]} hideCopy />
+                  {idx < arr.length - 1 && <div style={{ height: 1, background: "#F1EEE6", marginTop: 20 }} />}
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </div>

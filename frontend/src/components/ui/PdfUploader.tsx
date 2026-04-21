@@ -114,17 +114,67 @@ export default function PdfUploader({ onUploaded, multiple = false }: Props) {
         />
         {uploading ? (
           <div>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>...</div>
-            <div>업로드 중...</div>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                background: "var(--primary-light)",
+                color: "var(--primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 22,
+                margin: "0 auto 12px",
+              }}
+            >
+              ⋯
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 500 }}>업로드 중...</div>
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: 32, marginBottom: 12, color: "var(--text-muted)" }}>+</div>
-            <div style={{ fontSize: 15, fontWeight: 500 }}>
-              PDF 파일을 드래그하거나 클릭하여 업로드
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                background: "var(--primary-light)",
+                color: "var(--primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                fontWeight: 300,
+                margin: "0 auto 12px",
+              }}
+            >
+              +
             </div>
-            <div className="text-muted text-sm mt-2">
-              {multiple ? "여러 파일 선택 가능" : "PDF 파일 1개"}
+            <div style={{ fontSize: 15, fontWeight: 500 }}>
+              PDF를 끌어다 놓거나 클릭하세요
+            </div>
+            <div style={{ color: "var(--text-muted)", fontSize: 12.5, marginTop: 6 }}>
+              최대 100MB · DRM 암호화 파일 지원
+            </div>
+            <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 10 }}>
+              {[".pdf", "DRM", multiple ? "다중 업로드" : "단일 파일"].map((t) => (
+                <span
+                  key={t}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "3px 9px",
+                    background: "#F3F2EC",
+                    color: "var(--ink2)",
+                    borderRadius: 999,
+                    fontSize: 11.5,
+                    fontWeight: 500,
+                  }}
+                >
+                  {t}
+                </span>
+              ))}
             </div>
           </div>
         )}

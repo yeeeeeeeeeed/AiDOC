@@ -16,6 +16,59 @@ export default function TableExtractPage() {
   return <Suspense><TableExtractInner /></Suspense>;
 }
 
+function Stepper({ step }: { step: number }) {
+  const steps = [
+    { label: "업로드", desc: "PDF 선택" },
+    { label: "페이지 선택", desc: "범위 지정" },
+    { label: "추출", desc: "표 감지 · 변환" },
+  ];
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #EBE8E0",
+        borderRadius: 14,
+        padding: "16px 24px",
+        marginBottom: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 0,
+      }}
+    >
+      {steps.map((s, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", flex: i < steps.length - 1 ? 1 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                background: i < step ? "#0E8F5C" : i === step ? "#3B5BFF" : "#EBE8E0",
+                color: i <= step ? "#fff" : "#8A9199",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 11,
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              {i < step ? "✓" : i + 1}
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: i <= step ? "#0F1419" : "#8A9199" }}>{s.label}</div>
+              <div style={{ fontSize: 11.5, color: "#8A9199" }}>{s.desc}</div>
+            </div>
+          </div>
+          {i < steps.length - 1 && (
+            <div style={{ flex: 1, height: 1, background: "#EBE8E0", margin: "0 16px" }} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TableExtractInner() {
   const searchParams = useSearchParams();
 
@@ -26,6 +79,7 @@ function TableExtractInner() {
   const [progress, setProgress] = useState(0);
   const [steps, setSteps] = useState<StepStatus[]>([]);
   const [tables, setTables] = useState<TableData[]>([]);
+  const [activeTable, setActiveTable] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -102,36 +156,79 @@ function TableExtractInner() {
     }
   };
 
+  const exportCsv = async () => {
+    if (!upload || tables.length === 0) return;
+    const t = tables[activeTable];
+    if (!t) return;
+    const rows = [t.headers, ...t.rows];
+    const csv = rows.map((r) => r.map((c) => `"${(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${t.title || "표"}.csv`;
+    a.click();
+  };
+
+  const currentStep = !upload ? 0 : tables.length === 0 ? 1 : 2;
+
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>표 추출</h1>
-      <p className="text-muted mb-4">PDF에서 표를 감지하여 편집 가능한 엑셀로 변환합니다.</p>
+      {/* Page header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: -0.6, margin: 0 }}>표 추출</h1>
+        {tables.length > 0 && (
+          <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#E6F6EE", color: "#0E8F5C", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>
+            {tables.length}개 표 감지
+          </span>
+        )}
+      </div>
+      <p style={{ color: "#8A9199", fontSize: 13.5, marginBottom: 24 }}>PDF에서 표를 감지하여 편집 가능한 엑셀로 변환합니다</p>
 
+      {/* Stepper */}
+      <Stepper step={currentStep} />
+
+      {/* Upload */}
       {!upload && (
-        <div className="card">
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
           <PdfUploader onUploaded={handleUploaded} />
         </div>
       )}
 
       {upload && (
         <>
-          <div className="card">
-            <div className="flex-between">
-              <div>
-                <span className="font-bold">{upload.filename}</span>
-                <span className="text-muted text-sm" style={{ marginLeft: 12 }}>
-                  {upload.page_count}페이지
-                </span>
-              </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => { setUpload(null); setTables([]); clearSession(SESSION_KEY); }}>
-                다른 파일
-              </button>
+          {/* File chip */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #EBE8E0",
+              borderRadius: 14,
+              padding: "14px 20px",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <div className="pdf-icon">PDF</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>{upload.filename}</div>
+              <div style={{ fontSize: 11.5, color: "#8A9199", marginTop: 2 }}>{upload.page_count}페이지</div>
             </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => { setUpload(null); setTables([]); clearSession(SESSION_KEY); }}
+            >
+              다른 파일
+            </button>
           </div>
 
-          {upload.thumbnails.length > 0 && (
-            <div className="card">
-              <div className="card-header">페이지 선택</div>
+          {upload.thumbnails.length > 0 && tables.length === 0 && (
+            <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>페이지 선택</div>
+                <div style={{ flex: 1 }} />
+                <div style={{ fontSize: 12, color: "#8A9199" }}>{selectedPages.length}/{upload.page_count} 선택</div>
+              </div>
               <PageSelector
                 thumbnails={upload.thumbnails}
                 pageCount={upload.page_count}
@@ -141,45 +238,132 @@ function TableExtractInner() {
             </div>
           )}
 
-          <div className="card">
-            <div className="card-header">추가 지시 (선택)</div>
-            <textarea
-              className="textarea"
-              placeholder='예: 단가 컬럼만 추출, 합계 행 제외, "규격" 열 기준으로 분리...'
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-            />
-          </div>
+          {tables.length === 0 && (
+            <>
+              <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>추가 지시 (선택)</div>
+                <textarea
+                  className="textarea"
+                  placeholder='예: 단가 컬럼만 추출, 합계 행 제외, "규격" 열 기준으로 분리...'
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  style={{ fontSize: 13 }}
+                />
+              </div>
 
-          <button
-            className="btn btn-primary btn-block mb-4"
-            onClick={startExtract}
-            disabled={processing || selectedPages.length === 0}
-          >
-            {processing ? "추출 중..." : `표 추출 시작 (${selectedPages.length}페이지)`}
-          </button>
+              <button
+                className="btn btn-accent btn-block"
+                style={{ marginBottom: 16 }}
+                onClick={startExtract}
+                disabled={processing || selectedPages.length === 0}
+              >
+                {processing ? "추출 중..." : `표 추출 시작 (${selectedPages.length}페이지)`}
+              </button>
+            </>
+          )}
         </>
       )}
 
       {processing && (
-        <div className="card">
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}>
           <ProgressStream progress={progress} steps={steps} statusText="표 추출 중..." />
         </div>
       )}
 
-      {error && <div className="card" style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{error}</div>}
+      {error && (
+        <div style={{ background: "#FDEBE7", border: "1px solid #C8321E", borderRadius: 14, padding: 16, color: "#C8321E", fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
 
       {tables.length > 0 && (
-        <div className="card">
-          <div className="flex-between mb-3">
-            <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>
-              추출 결과 ({tables.length}개 표)
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden" }}>
+          {/* Table header */}
+          <div
+            style={{
+              padding: "14px 20px",
+              borderBottom: "1px solid #F1EEE6",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              {tables[activeTable]?.title || `표 ${activeTable + 1}`}
             </div>
-            <button className="btn btn-primary btn-sm" onClick={exportExcel}>
-              엑셀 다운로드
+            {tables[activeTable] && (
+              <span style={{ fontSize: 12, color: "#8A9199" }}>
+                {tables[activeTable].rows.length}행 × {tables[activeTable].headers.length}열
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            <button className="btn btn-secondary btn-sm" onClick={exportCsv}>↓ CSV</button>
+            <button
+              className="btn btn-primary btn-sm"
+              style={{ background: "#0E8F5C" }}
+              onClick={exportExcel}
+            >
+              ↓ 엑셀 다운로드
             </button>
           </div>
-          <TableEditor tables={tables} onTablesChange={setTables} />
+
+          {/* Table editor */}
+          <TableEditor
+            tables={[tables[activeTable]]}
+            onTablesChange={(updated) => {
+              const next = [...tables];
+              next[activeTable] = updated[0];
+              setTables(next);
+            }}
+          />
+
+          {/* Tabs */}
+          <div
+            style={{
+              padding: "10px 20px",
+              borderTop: "1px solid #F1EEE6",
+              display: "flex",
+              gap: 6,
+              fontSize: 12,
+            }}
+          >
+            {tables.map((t, i) => (
+              <div
+                key={i}
+                onClick={() => setActiveTable(i)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  background: i === activeTable ? "#0F1419" : "transparent",
+                  color: i === activeTable ? "#fff" : "#8A9199",
+                  cursor: "pointer",
+                  transition: "all 0.12s",
+                }}
+              >
+                {t.title || `표 ${i + 1}`}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Info banner */}
+      {tables.length > 0 && (
+        <div
+          style={{
+            background: "#EEF1FF",
+            borderRadius: 10,
+            padding: "12px 18px",
+            marginTop: 12,
+            fontSize: 12.5,
+            color: "#2740C7",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 15 }}>💡</span>
+          <span>셀을 클릭하여 직접 편집할 수 있습니다. 엑셀 다운로드 시 수정 내용이 반영됩니다.</span>
         </div>
       )}
     </div>

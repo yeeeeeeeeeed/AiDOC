@@ -42,7 +42,6 @@ function ContentExtractInner() {
         setUpload({ job_id: jobId, filename: data.filename, page_count: data.page_count, thumbnails: thumbs });
         setSelectedPages(Array.from({ length: data.page_count }, (_, i) => i + 1));
         saveSession(SESSION_KEY, { job_id: jobId, filename: data.filename, page_count: data.page_count });
-        // 이전 추출 결과 복원
         const saved = loadResult<Record<string, string>>(SESSION_KEY);
         if (saved && Object.keys(saved).length > 0) setContentPages(saved);
       })
@@ -83,10 +82,7 @@ function ContentExtractInner() {
           }
         },
         () => setProcessing(false),
-        (err) => {
-          setError(err);
-          setProcessing(false);
-        }
+        (err) => { setError(err); setProcessing(false); }
       );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "추출 시작 실패");
@@ -113,39 +109,58 @@ function ContentExtractInner() {
     .map((k) => contentPages[k])
     .join("\n\n---\n\n");
 
+  const hasResult = Object.keys(contentPages).length > 0;
+
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>내용 추출</h1>
-      <p className="text-muted mb-4">PDF의 모든 내용을 원본 구조 그대로 텍스트로 변환합니다.</p>
+      {/* Page header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: -0.6, margin: 0 }}>내용 추출</h1>
+        <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#EEF1FF", color: "#2740C7", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>AI</span>
+      </div>
+      <p style={{ color: "#8A9199", fontSize: 13.5, marginBottom: 24 }}>PDF의 모든 내용을 원본 구조 그대로 텍스트로 변환합니다</p>
 
-      {/* Upload */}
       {!upload && (
-        <div className="card">
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
           <PdfUploader onUploaded={handleUploaded} />
         </div>
       )}
 
-      {/* File info + page selector */}
       {upload && (
         <>
-          <div className="card">
-            <div className="flex-between">
-              <div>
-                <span className="font-bold">{upload.filename}</span>
-                <span className="text-muted text-sm" style={{ marginLeft: 12 }}>
-                  {upload.page_count}페이지
-                </span>
-              </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => { setUpload(null); setContentPages({}); clearSession(SESSION_KEY); }}>
-                다른 파일
-              </button>
+          {/* File chip */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #EBE8E0",
+              borderRadius: 14,
+              padding: "14px 20px",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <div className="pdf-icon">PDF</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>{upload.filename}</div>
+              <div style={{ fontSize: 11.5, color: "#8A9199", marginTop: 2 }}>{upload.page_count}페이지</div>
             </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => { setUpload(null); setContentPages({}); clearSession(SESSION_KEY); }}
+            >
+              다른 파일
+            </button>
           </div>
 
-          {/* Page selector */}
-          {upload.thumbnails.length > 0 && (
-            <div className="card">
-              <div className="card-header">페이지 선택</div>
+          {upload.thumbnails.length > 0 && !hasResult && (
+            <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>페이지 선택</div>
+                <div style={{ flex: 1 }} />
+                <div style={{ fontSize: 12, color: "#8A9199" }}>{selectedPages.length}/{upload.page_count} 선택</div>
+              </div>
               <PageSelector
                 thumbnails={upload.thumbnails}
                 pageCount={upload.page_count}
@@ -155,75 +170,100 @@ function ContentExtractInner() {
             </div>
           )}
 
-          {/* Custom prompt */}
-          <div className="card">
-            <div className="card-header">추가 지시 (선택)</div>
-            <textarea
-              className="textarea"
-              placeholder="예: 제목과 본문만 추출해줘, 수식은 LaTeX로 표현해줘..."
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-            />
-          </div>
+          {!hasResult && (
+            <>
+              <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>추가 지시 (선택)</div>
+                <textarea
+                  className="textarea"
+                  placeholder="예: 제목과 본문만 추출해줘, 수식은 LaTeX로 표현해줘..."
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  style={{ fontSize: 13 }}
+                />
+              </div>
 
-          {/* Start button */}
-          <button
-            className="btn btn-primary btn-block mb-4"
-            onClick={startExtract}
-            disabled={processing || selectedPages.length === 0}
-          >
-            {processing ? "추출 중..." : `내용 추출 시작 (${selectedPages.length}페이지)`}
-          </button>
+              <button
+                className="btn btn-accent btn-block"
+                style={{ marginBottom: 16 }}
+                onClick={startExtract}
+                disabled={processing || selectedPages.length === 0}
+              >
+                {processing ? "추출 중..." : `내용 추출 시작 (${selectedPages.length}페이지)`}
+              </button>
+            </>
+          )}
         </>
       )}
 
-      {/* Progress */}
       {processing && (
-        <div className="card">
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}>
           <ProgressStream progress={progress} steps={steps} statusText="내용 추출 중..." />
         </div>
       )}
 
-      {/* Error */}
-      {error && <div className="card" style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{error}</div>}
+      {error && (
+        <div style={{ background: "#FDEBE7", border: "1px solid #C8321E", borderRadius: 14, padding: 16, color: "#C8321E", fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
 
-      {/* Results */}
-      {fullContent && (
-        <div className="card">
-          <div className="flex-between mb-3">
-            <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>
-              추출 결과
-            </div>
-            <div className="flex gap-2">
-              <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(fullContent)}>
-                전체 복사
+      {hasResult && (
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden" }}>
+          <div
+            style={{
+              padding: "16px 24px",
+              borderBottom: "1px solid #F1EEE6",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600 }}>추출 결과</div>
+            <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#E6F6EE", color: "#0E8F5C", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>완료</span>
+            <div style={{ flex: 1 }} />
+            <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(fullContent)}>
+              ⎘ 전체 복사
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={exportDocx}>
+              ↓ 워드
+            </button>
+          </div>
+
+          <div style={{ padding: "0 24px" }}>
+            <div className="tabs" style={{ margin: "0 0 0" }}>
+              <button className={`tab ${activeTab === "preview" ? "active" : ""}`} onClick={() => setActiveTab("preview")}>
+                전체 보기
               </button>
-              <button className="btn btn-primary btn-sm" onClick={exportDocx}>
-                워드 다운로드
+              <button className={`tab ${activeTab === "pages" ? "active" : ""}`} onClick={() => setActiveTab("pages")}>
+                페이지별 보기
               </button>
             </div>
           </div>
 
-          {/* Tabs: all / per page */}
-          <div className="tabs">
-            <button className={`tab ${activeTab === "preview" ? "active" : ""}`} onClick={() => setActiveTab("preview")}>
-              전체 보기
-            </button>
-            <button className={`tab ${activeTab === "pages" ? "active" : ""}`} onClick={() => setActiveTab("pages")}>
-              페이지별 보기
-            </button>
+          <div style={{ padding: "16px 24px 24px" }}>
+            {activeTab === "preview" && <MarkdownView content={fullContent} hideCopy />}
+            {activeTab === "pages" &&
+              Object.keys(contentPages)
+                .sort((a, b) => Number(a) - Number(b))
+                .map((k) => (
+                  <div key={k} style={{ marginBottom: 20 }}>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#8A9199",
+                        fontFamily: `"JetBrains Mono", monospace`,
+                        marginBottom: 10,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      PAGE {k}
+                    </div>
+                    <MarkdownView content={contentPages[k]} hideCopy />
+                    <div style={{ height: 1, background: "#F1EEE6", marginTop: 20 }} />
+                  </div>
+                ))}
           </div>
-
-          {activeTab === "preview" && <MarkdownView content={fullContent} hideCopy />}
-          {activeTab === "pages" &&
-            Object.keys(contentPages)
-              .sort((a, b) => Number(a) - Number(b))
-              .map((k) => (
-                <div key={k} style={{ marginBottom: 16 }}>
-                  <div className="font-bold mb-2">페이지 {k}</div>
-                  <MarkdownView content={contentPages[k]} hideCopy />
-                </div>
-              ))}
         </div>
       )}
     </div>

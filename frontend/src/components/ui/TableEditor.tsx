@@ -41,46 +41,45 @@ export default function TableEditor({ tables, onTablesChange }: Props) {
 
   return (
     <div>
-      {/* Table tabs */}
-      <div className="flex gap-2 mb-3" style={{ flexWrap: "wrap" }}>
-        {tables.map((t, idx) => (
-          <button
-            key={idx}
-            className={`btn btn-sm ${idx === activeIdx ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => setActiveIdx(idx)}
-          >
-            {t.page ? `[p.${t.page}] ` : ""}
-            {t.title || `표 ${idx + 1}`}
-          </button>
-        ))}
-      </div>
-
-      {/* Controls */}
-      <div className="flex-between mb-2">
-        <span className="text-sm text-muted">
-          {table.headers.length}열 x {table.rows.length}행
-        </span>
-        <button className="btn btn-danger btn-sm" onClick={() => deleteTable(activeIdx)}>
-          이 표 삭제
-        </button>
-      </div>
+      {/* Show tabs only when multiple tables and no external tab control */}
+      {tables.length > 1 && (
+        <div style={{ display: "flex", gap: 6, padding: "10px 20px", borderBottom: "1px solid #F1EEE6" }}>
+          {tables.map((t, idx) => (
+            <div
+              key={idx}
+              onClick={() => setActiveIdx(idx)}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 6,
+                background: idx === activeIdx ? "#0F1419" : "transparent",
+                color: idx === activeIdx ? "#fff" : "#8A9199",
+                cursor: "pointer",
+                fontSize: 12,
+                transition: "all 0.12s",
+              }}
+            >
+              {t.title || `표 ${idx + 1}`}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Table */}
-      <div style={{ overflowX: "auto", maxHeight: 500, overflowY: "auto" }}>
+      <div style={{ overflowX: "auto", maxHeight: 520, overflowY: "auto" }}>
         <table className="table-preview">
           <thead>
             <tr>
-              <th style={{ width: 40 }}>#</th>
+              <th style={{ width: 36, textAlign: "center" }}>#</th>
               {table.headers.map((h, i) => (
                 <th key={i}>{h}</th>
               ))}
-              <th style={{ width: 50 }}></th>
+              <th style={{ width: 40 }}></th>
             </tr>
           </thead>
           <tbody>
             {table.rows.map((row, ri) => (
               <tr key={ri}>
-                <td className="text-muted text-sm">{ri + 1}</td>
+                <td style={{ textAlign: "center", color: "#8A9199", fontSize: 11.5, fontFamily: "var(--mono)" }}>{ri + 1}</td>
                 {row.map((cell, ci) => (
                   <td key={ci}>
                     <input
@@ -91,12 +90,20 @@ export default function TableEditor({ tables, onTablesChange }: Props) {
                 ))}
                 <td>
                   <button
-                    className="btn btn-sm"
-                    style={{ padding: "2px 6px", fontSize: 11, color: "var(--danger)" }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#8A9199",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      lineHeight: 1,
+                    }}
                     onClick={() => deleteRow(activeIdx, ri)}
                     title="행 삭제"
                   >
-                    x
+                    ×
                   </button>
                 </td>
               </tr>

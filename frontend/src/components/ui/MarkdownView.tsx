@@ -20,7 +20,7 @@ export default function MarkdownView({ content, hideCopy = false }: Props) {
           </button>
         </div>
       )}
-      <div className="md-content card">
+      <div className="md-content" style={{ lineHeight: 1.75, fontSize: 13.5 }}>
         <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
       </div>
     </div>

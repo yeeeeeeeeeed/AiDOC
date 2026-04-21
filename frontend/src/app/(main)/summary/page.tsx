@@ -103,105 +103,190 @@ function SummaryInner() {
     }
   };
 
+  const LENGTH_OPTIONS = [
+    { k: "short" as const, l: "간단", s: "3~5문장" },
+    { k: "medium" as const, l: "보통", s: "반 페이지" },
+    { k: "detailed" as const, l: "상세", s: "1~2p" },
+  ];
+
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>문서 요약</h1>
-      <p className="text-muted mb-4">AI가 PDF 문서를 분석하여 핵심 내용을 요약합니다.</p>
+      {/* Page header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: -0.6, margin: 0 }}>문서 요약</h1>
+        <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#EEF1FF", color: "#2740C7", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>AI</span>
+      </div>
+      <p style={{ color: "#8A9199", fontSize: 13.5, marginBottom: 24 }}>AI가 PDF 문서를 분석하여 핵심 내용을 요약합니다</p>
 
       {!upload && (
-        <div className="card">
+        <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
           <PdfUploader onUploaded={handleUploaded} />
         </div>
       )}
 
       {upload && (
         <>
-          <div className="card">
-            <div className="flex-between">
-              <div>
-                <span className="font-bold">{upload.filename}</span>
-                <span className="text-muted text-sm" style={{ marginLeft: 12 }}>{upload.page_count}페이지</span>
-              </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => { setUpload(null); setSummary(""); clearSession(SESSION_KEY); }}>
-                다른 파일
-              </button>
-            </div>
-          </div>
-
-          {upload.thumbnails.length > 0 && (
-            <div className="card">
-              <div className="card-header">페이지 선택</div>
-              <PageSelector
-                thumbnails={upload.thumbnails}
-                pageCount={upload.page_count}
-                selectedPages={selectedPages}
-                onSelectionChange={setSelectedPages}
-              />
-            </div>
-          )}
-
-          <div className="card">
-            <div className="card-header">요약 옵션</div>
-            <div className="flex gap-3 mb-3">
-              {(["short", "medium", "detailed"] as const).map((l) => (
-                <button
-                  key={l}
-                  className={`btn btn-sm ${length === l ? "btn-primary" : "btn-secondary"}`}
-                  onClick={() => setLength(l)}
-                >
-                  {{ short: "간단 (3~5문장)", medium: "보통 (반 페이지)", detailed: "상세 (1~2페이지)" }[l]}
-                </button>
-              ))}
-            </div>
-            <textarea
-              className="textarea"
-              placeholder="추가 지시 (선택): 예) 계약 조건 위주로 요약, 숫자 데이터 포함..."
-              value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
-            />
-          </div>
-
-          <button
-            className="btn btn-primary btn-block mb-4"
-            onClick={startSummary}
-            disabled={processing || selectedPages.length === 0}
+          {/* File chip */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #EBE8E0",
+              borderRadius: 14,
+              padding: "16px 20px",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+            }}
           >
-            {processing ? "요약 중..." : `요약 시작 (${selectedPages.length}페이지)`}
-          </button>
+            <div className="pdf-icon">PDF</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>{upload.filename}</div>
+              <div style={{ fontSize: 12, color: "#8A9199", marginTop: 2 }}>{upload.page_count}페이지</div>
+            </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => { setUpload(null); setSummary(""); clearSession(SESSION_KEY); }}
+            >
+              다른 파일
+            </button>
+          </div>
+
+          {/* Main layout */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}>
+            {/* Left column */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {upload.thumbnails.length > 0 && (
+                <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24 }}>
+                  <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>페이지 선택</div>
+                    <div style={{ flex: 1 }} />
+                    <div style={{ fontSize: 12, color: "#8A9199" }}>
+                      {selectedPages.length}/{upload.page_count} 선택
+                    </div>
+                  </div>
+                  <PageSelector
+                    thumbnails={upload.thumbnails}
+                    pageCount={upload.page_count}
+                    selectedPages={selectedPages}
+                    onSelectionChange={setSelectedPages}
+                  />
+                </div>
+              )}
+
+              {processing && (
+                <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>요약 중...</span>
+                    <span style={{ fontSize: 12.5, color: "#8A9199" }}>{progress}%</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div style={{ background: "#FDEBE7", border: "1px solid #C8321E", borderRadius: 14, padding: 16, color: "#C8321E", fontSize: 13 }}>
+                  {error}
+                </div>
+              )}
+
+              {summary && (
+                <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>요약 결과</div>
+                    <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#E6F6EE", color: "#0E8F5C", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>완료</span>
+                    <div style={{ flex: 1 }} />
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => navigator.clipboard.writeText(summary)}
+                    >
+                      ⎘ 복사
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={exportDocx}>
+                      ↓ 워드
+                    </button>
+                  </div>
+                  <MarkdownView content={summary} hideCopy />
+                </div>
+              )}
+            </div>
+
+            {/* Right column: options */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>요약 옵션</div>
+
+                <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>요약 길이</div>
+                <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+                  {LENGTH_OPTIONS.map((o) => (
+                    <div
+                      key={o.k}
+                      onClick={() => setLength(o.k)}
+                      style={{
+                        flex: 1,
+                        padding: "10px 8px",
+                        borderRadius: 8,
+                        textAlign: "center",
+                        border: length === o.k ? "1.5px solid #0F1419" : "1px solid #EBE8E0",
+                        background: length === o.k ? "#0F1419" : "#fff",
+                        color: length === o.k ? "#fff" : "#0F1419",
+                        cursor: "pointer",
+                        transition: "all 0.12s",
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{o.l}</div>
+                      <div style={{ fontSize: 10.5, opacity: 0.7, marginTop: 2 }}>{o.s}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>추가 지시 (선택)</div>
+                <textarea
+                  className="textarea"
+                  placeholder="예) 계약 조건과 숫자 데이터 위주로 요약, bullet 형식 선호"
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  style={{ minHeight: 80, fontSize: 12.5 }}
+                />
+
+                <button
+                  className="btn btn-accent btn-block"
+                  style={{ marginTop: 16 }}
+                  onClick={startSummary}
+                  disabled={processing || selectedPages.length === 0}
+                >
+                  {processing ? "요약 중..." : `✨ 요약 시작 · ${selectedPages.length}페이지`}
+                </button>
+              </div>
+
+              {/* Quick presets */}
+              <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>빠른 프리셋</div>
+                {["계약서 핵심 조항만", "숫자/금액 중심", "실행 체크리스트"].map((t) => (
+                  <div
+                    key={t}
+                    onClick={() => setCustomPrompt(t)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 6,
+                      fontSize: 12.5,
+                      color: "#4A5259",
+                      marginBottom: 2,
+                      cursor: "pointer",
+                      transition: "background 0.1s",
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#F1EEE6"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
+                  >
+                    · {t}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </>
-      )}
-
-      {processing && (
-        <div className="card">
-          <div className="flex-between mb-2">
-            <span className="text-sm font-bold">요약 중...</span>
-            <span className="text-sm text-muted">{progress}%</span>
-          </div>
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-      )}
-
-      {error && <div className="card" style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{error}</div>}
-
-      {summary && (
-        <div className="card">
-          <div className="flex-between mb-3">
-            <div className="card-header" style={{ marginBottom: 0, borderBottom: "none", paddingBottom: 0 }}>
-              요약 결과
-            </div>
-            <div className="flex gap-2">
-              <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(summary)}>
-                복사
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={exportDocx}>
-                워드 다운로드
-              </button>
-            </div>
-          </div>
-          <MarkdownView content={summary} hideCopy />
-        </div>
       )}
     </div>
   );

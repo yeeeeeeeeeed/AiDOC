@@ -12,12 +12,18 @@ export default function ProgressStream({ progress, steps, statusText }: Props) {
   return (
     <div>
       {/* Progress bar */}
-      <div className="flex-between mb-2">
-        <span className="text-sm font-bold">{statusText || "처리 중..."}</span>
-        <span className="text-sm text-muted">{progress}%</span>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 500 }}>{statusText || "처리 중..."}</span>
+        <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--mono)" }}>{progress}%</span>
       </div>
-      <div className="progress-bar mb-3">
-        <div className="progress-fill" style={{ width: `${progress}%` }} />
+      <div className="progress-bar" style={{ marginBottom: 14 }}>
+        <div
+          className="progress-fill"
+          style={{
+            width: `${progress}%`,
+            background: "linear-gradient(90deg, var(--primary), #7B8EFF)",
+          }}
+        />
       </div>
 
       {/* Steps */}
