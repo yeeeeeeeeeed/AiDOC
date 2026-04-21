@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s %(message)s")
 
-from routers import upload, extract_content, extract_table, summary, compare, translate, export, history
+from routers import upload, extract_content, extract_table, summary, compare, translate, export, history, me
 
 app = FastAPI(title="AiDoc API", version="1.0.0")
 
@@ -29,6 +29,7 @@ app.include_router(compare.router,         prefix="/api/pdf/compare")
 app.include_router(translate.router,       prefix="/api/pdf/translate")
 app.include_router(export.router,          prefix="/api/pdf/export")
 app.include_router(history.router,         prefix="/api/admin")
+app.include_router(me.router,              prefix="/api/me")
 
 
 @app.middleware("http")
