@@ -6,140 +6,126 @@ import PdfUploader from "@/components/ui/PdfUploader";
 import type { UploadResult } from "@/types";
 
 const FEATURES = [
-  {
-    key: "content",
-    label: "내용 추출",
-    desc: "PDF 내용을 원본 구조 그대로 워드/텍스트로 변환",
-    href: "/extract/content",
-    icon: "⊞",
-  },
-  {
-    key: "table",
-    label: "표 추출",
-    desc: "PDF의 표를 감지하여 편집 가능한 엑셀로 변환",
-    href: "/extract/table",
-    icon: "⊟",
-  },
-  {
-    key: "summary",
-    label: "문서 요약",
-    desc: "AI가 문서를 분석하여 핵심 내용을 요약",
-    href: "/summary",
-    icon: "≡",
-  },
-  {
-    key: "compare",
-    label: "PDF 비교",
-    desc: "두 PDF의 변경점을 자동으로 분석",
-    href: "/compare",
-    icon: "⊜",
-  },
-  {
-    key: "translate",
-    label: "번역",
-    desc: "PDF를 원하는 언어로 번역하여 추출",
-    href: "/translate",
-    icon: "⇄",
-  },
+  { key: "content",   label: "내용 추출",  desc: "스캔 PDF 포함, 텍스트를 원본 구조대로 추출",       href: "/extract/content", color: "#6366f1" },
+  { key: "table",     label: "표 추출",    desc: "병합 셀·복잡한 레이아웃 표를 Excel/CSV로 변환",   href: "/extract/table",   color: "#10b981" },
+  { key: "summary",   label: "문서 요약",  desc: "긴 보고서·회의록을 AI가 읽고 핵심 요약",           href: "/summary",         color: "#f59e0b" },
+  { key: "compare",   label: "PDF 비교",   desc: "두 버전의 변경사항을 페이지 단위로 분석",           href: "/compare",         color: "#ef4444" },
+  { key: "translate", label: "번역",       desc: "15개 언어로 즉시 번역, 원문·번역문 나란히 확인",   href: "/translate",       color: "#0891b2" },
 ];
 
 export default function HomePage() {
   const router = useRouter();
   const [uploads, setUploads] = useState<UploadResult[]>([]);
 
-  const handleUploaded = (result: UploadResult) => {
-    setUploads((prev) => [...prev, result]);
+  const goToFeature = (href: string) => {
+    if (!uploads.length) return;
+    router.push(`${href}?jobs=${uploads.map(u => u.job_id).join(",")}`);
   };
 
-  const goToFeature = (href: string) => {
-    if (uploads.length === 0) return;
-    const jobIds = uploads.map((u) => u.job_id).join(",");
-    router.push(`${href}?jobs=${jobIds}`);
-  };
+  const hasUploads = uploads.length > 0;
 
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>AiDoc</h1>
-      <p className="text-muted mb-4">PDF 문서를 업로드하고 원하는 기능을 선택하세요.</p>
+      {/* 페이지 타이틀 */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 4 }}>홈</h1>
+        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>PDF를 업로드하고 원하는 기능을 선택하세요.</p>
+      </div>
 
-      {/* Upload */}
-      <div className="card">
-        <div className="card-header">PDF 업로드</div>
-        <PdfUploader onUploaded={handleUploaded} multiple />
+      {/* 좌우 분할 */}
+      <div style={{ display: "grid", gridTemplateColumns: "5fr 7fr", gap: 20, alignItems: "start" }}>
 
-        {/* Uploaded files */}
-        {uploads.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div className="text-sm" style={{ fontWeight: 600, marginBottom: 8 }}>
-              업로드된 파일 ({uploads.length}개)
-            </div>
-          {uploads.map((u, i) => (
-            <div
-              key={u.job_id}
-              className="flex-between"
-              style={{
-                padding: "10px 0",
-                borderBottom: i < uploads.length - 1 ? "1px solid var(--border)" : "none",
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 500 }}>{u.filename}</div>
-                <div className="text-sm text-muted">{u.page_count}페이지</div>
-              </div>
-              <span className="badge badge-success">업로드 완료</span>
-            </div>
-          ))}
+        {/* 왼쪽: 업로드 */}
+        <div className="card" style={{ position: "sticky", top: 20, marginBottom: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            PDF 업로드
+          </div>
+          <PdfUploader onUploaded={r => setUploads(p => [...p, r])} multiple />
 
-          {/* Thumbnails for last upload */}
-          {uploads[uploads.length - 1].thumbnails.length > 0 && (
+          {hasUploads && (
             <div style={{ marginTop: 16 }}>
-              <div className="text-sm text-muted mb-2">페이지 미리보기</div>
-              <div className="thumbnails">
-                {uploads[uploads.length - 1].thumbnails.map((thumb, idx) => (
-                  <div key={idx} className="thumbnail">
-                    <img src={`data:image/png;base64,${thumb}`} alt={`p.${idx + 1}`} />
-                    <span className="page-num">{idx + 1}</span>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
+                업로드된 파일
+              </div>
+              {uploads.map((u, i) => (
+                <div key={u.job_id} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "9px 0",
+                  borderBottom: i < uploads.length - 1 ? "1px solid var(--border)" : "none",
+                }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{u.filename}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{u.page_count}페이지</div>
                   </div>
-                ))}
+                  <span className="badge badge-success">완료</span>
+                </div>
+              ))}
+
+              <div style={{
+                marginTop: 14, padding: "10px 14px",
+                background: "var(--primary-light)",
+                borderRadius: 8, fontSize: 12,
+                color: "var(--primary)", fontWeight: 500,
+                borderLeft: "3px solid var(--primary)",
+              }}>
+                오른쪽에서 기능을 선택하세요
               </div>
             </div>
           )}
-          </div>
-        )}
-      </div>
+        </div>
 
-      {/* Feature selection */}
-      <div className="card">
-        <div className="card-header">기능 선택</div>
-        <div className="grid-3">
-          {FEATURES.map((f) => (
-            <div
-              key={f.key}
-              onClick={() => goToFeature(f.href)}
-              style={{
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius)",
-                padding: 20,
-                cursor: uploads.length > 0 ? "pointer" : "not-allowed",
-                opacity: uploads.length > 0 ? 1 : 0.5,
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                if (uploads.length > 0) {
-                  (e.currentTarget as HTMLElement).style.borderColor = "var(--primary)";
-                  (e.currentTarget as HTMLElement).style.background = "var(--primary-light)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
-                (e.currentTarget as HTMLElement).style.background = "";
-              }}
-            >
-              <div style={{ fontSize: 28, marginBottom: 8 }}>{f.icon}</div>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>{f.label}</div>
-              <div className="text-sm text-muted">{f.desc}</div>
-            </div>
-          ))}
+        {/* 오른쪽: 기능 카드 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {FEATURES.map(f => {
+            const isHoverable = hasUploads;
+            return (
+              <div
+                key={f.key}
+                onClick={() => goToFeature(f.href)}
+                style={{
+                  background: "white",
+                  borderRadius: "var(--radius)",
+                  boxShadow: "var(--shadow)",
+                  padding: "16px 20px",
+                  display: "flex", alignItems: "center", gap: 16,
+                  cursor: isHoverable ? "pointer" : "not-allowed",
+                  opacity: isHoverable ? 1 : 0.45,
+                  transition: "all 0.15s",
+                  borderLeft: `3px solid ${isHoverable ? f.color : "var(--border)"}`,
+                }}
+                onMouseEnter={e => {
+                  if (!isHoverable) return;
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.boxShadow = "var(--shadow-md)";
+                  el.style.transform = "translateX(3px)";
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.boxShadow = "var(--shadow)";
+                  el.style.transform = "";
+                }}
+              >
+                {/* 색 아이콘 점 */}
+                <div style={{
+                  width: 36, height: 36, borderRadius: 9,
+                  background: f.color + "18",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0,
+                }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 3, background: f.color }} />
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3, color: "var(--text)" }}>{f.label}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>{f.desc}</div>
+                </div>
+
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={isHoverable ? f.color : "var(--border)"} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "stroke 0.15s" }}>
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
