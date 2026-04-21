@@ -45,8 +45,8 @@ body {
 
 .main-content {
   flex: 1;
-  margin-left: 240px;
-  padding: 28px 40px 48px;
+  margin-left: 248px;
+  padding: 84px 40px 48px; /* 56px topbar + 28px */
 }
 
 /* Card */
@@ -159,13 +159,13 @@ textarea:focus-visible {
 
 /* Upload zone */
 .upload-zone {
-  border: 1.5px dashed var(--border);
+  border: 2px dashed var(--border);
   border-radius: 12px;
   padding: 40px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
-  background: repeating-linear-gradient(135deg, var(--bg), var(--bg) 10px, #F5F2EB 10px, #F5F2EB 11px);
+  transition: border-color 0.2s, background 0.2s;
+  background: var(--bg);
 }
 
 .upload-zone:hover, .upload-zone.dragover {
@@ -457,11 +457,11 @@ textarea:focus-visible {
 
 /* Responsive */
 @media (max-width: 1280px) {
-  .main-content { padding: 20px 24px 32px; }
+  .main-content { padding: 76px 24px 32px; }
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 768px) {
-  .main-content { margin-left: 0; padding: 16px; }
+  .main-content { margin-left: 0; padding: 72px 16px 32px; }
   .grid-2, .grid-3, .grid-4, .compare-view { grid-template-columns: 1fr; }
 }

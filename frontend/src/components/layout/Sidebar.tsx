@@ -63,7 +63,7 @@ export default function Sidebar() {
   return (
     <aside
       style={{
-        width: 240,
+        width: 248,
         background: "#17181C",
         color: "#E5E5E0",
         position: "fixed",
@@ -167,7 +167,7 @@ export default function Sidebar() {
                 <span
                   style={{
                     fontSize: 13,
-                    width: 18,
+                    width: 22,
                     textAlign: "center",
                     color: isActive ? "#3B5BFF" : "#797C82",
                     fontFamily: MONO,

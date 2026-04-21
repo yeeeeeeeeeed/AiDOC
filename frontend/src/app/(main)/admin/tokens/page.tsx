@@ -99,8 +99,12 @@ export default function TokensPage() {
   }, [tokenDateFrom, tokenDateTo, tokenPage, tokenFilterUser, tokenFilterMenu]);
 
   useEffect(() => {
-    if (access?.is_admin) { fetchTokenSummary(); fetchTokenDetail(); }
+    if (access?.is_admin) fetchTokenSummary();
   }, [access]);
+
+  useEffect(() => {
+    if (access?.is_admin) fetchTokenDetail();
+  }, [access, tokenPage]);
 
   if (access && !access.is_admin) {
     return (
