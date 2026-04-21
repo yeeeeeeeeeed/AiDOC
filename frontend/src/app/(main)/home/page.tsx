@@ -15,12 +15,20 @@ const FEATURES = [
   { key: "translate",label: "번역",      desc: "원본 구조 그대로 다국어 번역", href: "/translate",       icon: "A⇋가", tint: "#FDEBE7", ink: "#C8321E" },
 ];
 
+const MENU_STYLE: Record<string, { tint: string; ink: string }> = {
+  요약:    { tint: "#EEF1FF", ink: "#2740C7" },
+  표추출:  { tint: "#E6F6EE", ink: "#0E8F5C" },
+  내용추출:{ tint: "#FFF2DE", ink: "#B26A00" },
+  번역:    { tint: "#F3EEFF", ink: "#6B3FC4" },
+  비교:    { tint: "#F1EEE6", ink: "#4A5259" },
+};
+
 const MOCK_RECENT = [
-  { menu: "요약",    file: "2026 시공품질 관리계획서.pdf", time: "오늘 14:32", tint: "#FFF2DE", ink: "#B26A00" },
-  { menu: "표추출",  file: "자재단가표_2026Q2.pdf",        time: "오늘 13:55", tint: "#E6F6EE", ink: "#0E8F5C" },
-  { menu: "내용추출",file: "현장안전수칙_개정안.pdf",       time: "오늘 13:20", tint: "#F3F2EC", ink: "#4A5259" },
-  { menu: "번역",    file: "ENG-spec-pipeline.pdf",         time: "오늘 12:48", tint: "#FDEBE7", ink: "#C8321E" },
-  { menu: "PDF비교", file: "협력사 계약서 v3.2.pdf",        time: "어제 17:15", tint: "#F5EEFF", ink: "#6B3DDB" },
+  { menu: "요약",    file: "2026 시공품질 관리계획서.pdf", time: "오늘 14:32" },
+  { menu: "표추출",  file: "자재단가표_2026Q2.pdf",        time: "오늘 13:55" },
+  { menu: "내용추출",file: "현장안전수칙_개정안.pdf",       time: "오늘 13:20" },
+  { menu: "번역",    file: "ENG-spec-pipeline.pdf",         time: "오늘 12:48" },
+  { menu: "비교",    file: "협력사 계약서 v3.2.pdf",        time: "어제 17:15" },
 ];
 
 export default function HomePage() {
@@ -276,40 +284,47 @@ export default function HomePage() {
             📋 목업 데이터
           </div>
         </div>
-        {MOCK_RECENT.map((r, i) => (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              padding: "12px 20px",
-              borderBottom: i < MOCK_RECENT.length - 1 ? "1px solid #F1EEE6" : "none",
-            }}
-          >
-            <span
+        {MOCK_RECENT.map((r, i) => {
+          const s = MENU_STYLE[r.menu] ?? { tint: "#F1EEE6", ink: "#4A5259" };
+          return (
+            <div
+              key={i}
               style={{
-                display: "inline-flex",
+                display: "flex",
                 alignItems: "center",
-                padding: "3px 9px",
-                background: r.tint,
-                color: r.ink,
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 600,
-                flexShrink: 0,
-                minWidth: 52,
-                justifyContent: "center",
+                gap: 14,
+                padding: "12px 20px",
+                borderBottom: i < MOCK_RECENT.length - 1 ? "1px solid #F1EEE6" : "none",
+                cursor: "pointer",
+                transition: "background 0.1s",
               }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#F1EEE6"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
             >
-              {r.menu}
-            </span>
-            <div style={{ flex: 1, fontSize: 13, fontWeight: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {r.file}
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "3px 9px",
+                  background: s.tint,
+                  color: s.ink,
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  flexShrink: 0,
+                  minWidth: 52,
+                  justifyContent: "center",
+                }}
+              >
+                {r.menu}
+              </span>
+              <div style={{ flex: 1, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {r.file}
+              </div>
+              <div style={{ fontSize: 11.5, color: "#8A9199", fontFamily: MONO, flexShrink: 0 }}>{r.time}</div>
             </div>
-            <div style={{ fontSize: 11.5, color: "#8A9199", fontFamily: MONO, flexShrink: 0 }}>{r.time}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
