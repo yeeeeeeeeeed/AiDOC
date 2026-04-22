@@ -8,7 +8,6 @@ import type { UploadResult } from "@/types";
 
 const MONO = `"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace`;
 
-// 토큰 로그 menu 필드(한글)와 칩 스타일 매핑
 const MENU_META: Record<string, { label: string; bg: string; fg: string; href: string }> = {
   요약:    { label: "요약",    bg: "#EEF1FF", fg: "#2740C7", href: "/summary" },
   표추출:  { label: "표추출",  bg: "#E6F6EE", fg: "#0E8F5C", href: "/extract/table" },
@@ -42,7 +41,6 @@ interface MyStats {
 
 function relativeTime(ts: string): string {
   if (!ts) return "";
-  const d = new Date(ts);
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const yestStr = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
@@ -50,10 +48,11 @@ function relativeTime(ts: string): string {
   const timeStr = ts.slice(11, 16);
   if (tsDate === todayStr) return `오늘 ${timeStr}`;
   if (tsDate === yestStr) return `어제 ${timeStr}`;
+  const diffDays = Math.round((now.getTime() - new Date(ts).getTime()) / 86400000);
+  if (diffDays < 30) return `${diffDays}일 전`;
   return tsDate;
 }
 
-// 스켈레톤 shimmer 애니메이션은 globals.css에 없으므로 인라인으로 처리
 function Skeleton({ width, height }: { width: number | string; height: number }) {
   return (
     <div
@@ -72,7 +71,9 @@ function Skeleton({ width, height }: { width: number | string; height: number })
 export default function HomePage() {
   const router = useRouter();
   const [uploads, setUploads] = useState<UploadResult[]>([]);
-  const [showAll, setShowAll] = useState(false);
+  const [viewState, setViewState] = useState<"upload" | "selected">("upload");
+  const [heroOpacity, setHeroOpacity] = useState(1);
+  const [transitioning, setTransitioning] = useState(false);
 
   const [recentJobs, setRecentJobs] = useState<RecentJob[] | null>(null);
   const [stats, setStats] = useState<MyStats | null>(null);
@@ -90,12 +91,30 @@ export default function HomePage() {
     });
   }, []);
 
+  const transitionTo = (target: "upload" | "selected") => {
+    if (transitioning) return;
+    setTransitioning(true);
+    setHeroOpacity(0);
+    setTimeout(() => {
+      setViewState(target);
+      setHeroOpacity(1);
+      setTimeout(() => setTransitioning(false), 10);
+    }, 200);
+  };
+
   const handleUploaded = (result: UploadResult) => {
     setUploads((prev) => [...prev, result]);
+    if (viewState === "upload") {
+      transitionTo("selected");
+    }
+  };
+
+  const clearUploads = () => {
+    setUploads([]);
+    transitionTo("upload");
   };
 
   const goToFeature = (href: string) => {
-    if (uploads.length === 0) return;
     const jobIds = uploads.map((u) => u.job_id).join(",");
     router.push(`${href}?jobs=${jobIds}`);
   };
@@ -106,31 +125,94 @@ export default function HomePage() {
     router.push(`${meta.href}?jobs=${job.job_id}`);
   };
 
-  const visibleFeatures = showAll ? FEATURES : FEATURES.slice(0, 4);
+  const latestJob = recentJobs && recentJobs.length > 0 ? recentJobs[0] : null;
+  const latestJobMeta = latestJob ? (MENU_META[latestJob.menu] ?? null) : null;
 
   const topMenuMeta = stats?.top_menu ? MENU_META[stats.top_menu] : null;
-  const topPct = stats && stats.total_jobs > 0 && stats.top_menu_count > 0
-    ? Math.round((stats.top_menu_count / stats.total_jobs) * 100)
-    : 0;
+  const topPct =
+    stats && stats.total_jobs > 0 && stats.top_menu_count > 0
+      ? Math.round((stats.top_menu_count / stats.total_jobs) * 100)
+      : 0;
+
+  // Shared feature grid — called as a function (not a component) to avoid remount
+  const featureGrid = ({ enabled, gap = 8 }: { enabled: boolean; gap?: number }) => (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap }}>
+      {FEATURES.map((f) => (
+        <div
+          key={f.key}
+          onClick={() => enabled && goToFeature(f.href)}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            padding: "14px",
+            background: "#fff",
+            border: "1px solid #EBE8E0",
+            borderRadius: 10,
+            cursor: enabled ? "pointer" : "not-allowed",
+            opacity: enabled ? 1 : 0.5,
+            transition: "border-color 0.12s",
+          }}
+          onMouseEnter={(e) => { if (enabled) (e.currentTarget as HTMLElement).style.borderColor = "#3B5BFF"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#EBE8E0"; }}
+        >
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: f.tint, color: f.ink, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 12, flexShrink: 0 }}>
+            {f.icon}
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>{f.label}</div>
+            <div style={{ fontSize: 11, color: "#8A9199", marginTop: 2, lineHeight: 1.4 }}>{f.desc}</div>
+          </div>
+        </div>
+      ))}
+
+      {/* 6th slot: 다시 실행 — visibility:hidden keeps grid shape when empty */}
+      <div style={{ visibility: latestJob ? "visible" : "hidden" }}>
+        <div
+          onClick={() => latestJob && goToJob(latestJob)}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            padding: "14px",
+            background: "#fff",
+            border: "1px solid #EBE8E0",
+            borderRadius: 10,
+            cursor: latestJob ? "pointer" : "default",
+            height: "100%",
+            transition: "border-color 0.12s",
+          }}
+          onMouseEnter={(e) => { if (latestJob) (e.currentTarget as HTMLElement).style.borderColor = "#3B5BFF"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#EBE8E0"; }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#F5F2EB", color: "#4A5259", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>↻</div>
+            <span style={{ fontSize: 11, color: "#8A9199", fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase" as const }}>최근</span>
+          </div>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 500 }}>다시 실행 · {latestJobMeta?.label ?? latestJob?.menu}</div>
+            <div style={{ fontSize: 11.5, color: "#8A9199", marginTop: 2 }}>
+              {latestJob ? `${relativeTime(latestJob.timestamp)} 처리` : ""}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const totalPages = uploads.reduce((acc, u) => acc + u.page_count, 0);
+  const allThumbnails = uploads.flatMap((u) =>
+    u.thumbnails.map((thumb, idx) => ({ thumb, idx, jobId: u.job_id }))
+  );
 
   return (
     <>
-      {/* shimmer keyframe — scoped inline via style tag */}
       <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
 
       <div>
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
-          <div
-            style={{
-              fontSize: 11,
-              color: "#8A9199",
-              marginBottom: 6,
-              fontWeight: 600,
-              letterSpacing: 0.8,
-              textTransform: "uppercase",
-            }}
-          >
+          <div style={{ fontSize: 11, color: "#8A9199", marginBottom: 6, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase" }}>
             Welcome Back
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 600, letterSpacing: -0.6, margin: 0, lineHeight: 1.25 }}>
@@ -139,118 +221,139 @@ export default function HomePage() {
           </h1>
         </div>
 
-        {/* Hero card */}
+        {/* Hero section — fades between State A and State B */}
         <div
           style={{
-            background: "#FFFFFF",
-            border: "1px solid #EBE8E0",
-            borderRadius: 14,
-            padding: 32,
             marginBottom: 32,
+            opacity: heroOpacity,
+            pointerEvents: transitioning ? "none" : "auto",
+            transition: "opacity 200ms ease-out",
           }}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
-            {/* Left: upload */}
-            <div>
-              <div style={{ fontSize: 11.5, color: "#2740C7", fontWeight: 600, letterSpacing: 0.5, marginBottom: 12 }}>
-                STEP 01 · 업로드
-              </div>
-              <PdfUploader onUploaded={handleUploaded} multiple />
-
-              {uploads.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 12, color: "#8A9199", fontWeight: 600, marginBottom: 10, letterSpacing: 0.3 }}>
-                    업로드된 파일 ({uploads.length}개)
+          {viewState === "upload" ? (
+            /* ── State A: split hero card, 4fr:8fr ── */
+            <div style={{ background: "#FFFFFF", border: "1px solid #EBE8E0", borderRadius: 14, padding: 32 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "4fr 8fr", gap: 40 }}>
+                {/* Left: upload zone */}
+                <div>
+                  <div style={{ fontSize: 11.5, color: "#2740C7", fontWeight: 600, letterSpacing: 0.5, marginBottom: 12 }}>
+                    STEP 01 · 업로드
                   </div>
-                  {uploads.map((u, i) => (
-                    <div
-                      key={u.job_id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "10px 0",
-                        borderBottom: i < uploads.length - 1 ? "1px solid #F1EEE6" : "none",
-                      }}
-                    >
-                      <div className="pdf-icon">PDF</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{u.filename}</div>
-                        <div style={{ fontSize: 11.5, color: "#8A9199", marginTop: 2 }}>{u.page_count}페이지</div>
-                      </div>
-                      <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#E6F6EE", color: "#0E8F5C", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>
-                        완료
-                      </span>
-                    </div>
-                  ))}
+                  <PdfUploader onUploaded={handleUploaded} multiple />
                 </div>
-              )}
 
-              {uploads.length > 0 && uploads[uploads.length - 1].thumbnails.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 8 }}>페이지 미리보기</div>
-                  <div className="thumbnails">
-                    {uploads[uploads.length - 1].thumbnails.map((thumb, idx) => (
-                      <div key={idx} className="thumbnail">
-                        <img src={`data:image/png;base64,${thumb}`} alt={`p.${idx + 1}`} />
-                        <span className="page-num">{idx + 1}</span>
+                {/* Right: 3×2 feature grid */}
+                <div>
+                  <div style={{ fontSize: 11.5, color: "#8A9199", fontWeight: 600, letterSpacing: 0.5, marginBottom: 14 }}>
+                    STEP 02 · 기능 선택
+                  </div>
+                  {featureGrid({ enabled: false, gap: 8 })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ── State B: file card + feature card, full width ── */
+            <>
+              {/* File card */}
+              <div style={{ background: "#FFFFFF", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    marginBottom: allThumbnails.length > 0 ? 14 : 0,
+                  }}
+                >
+                  <div className="pdf-icon">PDF</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {uploads.length === 1 ? (
+                      <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {uploads[0].filename}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {uploads[0].filename}
+                        <span style={{ color: "#8A9199", fontWeight: 400 }}> 외 {uploads.length - 1}개</span>
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11.5, color: "#8A9199", marginTop: 3 }}>
+                      {uploads.length > 1 ? `${uploads.length}개 파일 · ` : ""}{totalPages}페이지
+                    </div>
+                  </div>
+                  <button
+                    onClick={clearUploads}
+                    title="파일 제거"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      fontSize: 22,
+                      color: "#8A9199",
+                      fontFamily: "inherit",
+                      lineHeight: 1,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Thumbnail horizontal scroll */}
+                {allThumbnails.length > 0 && (
+                  <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+                    {allThumbnails.map(({ thumb, idx, jobId }) => (
+                      <div
+                        key={`${jobId}-${idx}`}
+                        style={{
+                          flexShrink: 0,
+                          width: 72,
+                          height: 90,
+                          borderRadius: 6,
+                          border: "1px solid #EBE8E0",
+                          overflow: "hidden",
+                          position: "relative",
+                        }}
+                      >
+                        <img
+                          src={`data:image/png;base64,${thumb}`}
+                          alt={`p.${idx + 1}`}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                        <span
+                          style={{
+                            position: "absolute",
+                            bottom: 3,
+                            right: 3,
+                            background: "rgba(0,0,0,0.6)",
+                            color: "#fff",
+                            fontSize: 9,
+                            padding: "1px 4px",
+                            borderRadius: 3,
+                            fontFamily: MONO,
+                          }}
+                        >
+                          {idx + 1}
+                        </span>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* Right: feature grid 2×2 */}
-            <div>
-              <div style={{ fontSize: 11.5, color: "#8A9199", fontWeight: 600, letterSpacing: 0.5, marginBottom: 14 }}>
-                STEP 02 · 기능 선택
+              {/* Feature card */}
+              <div style={{ background: "#FFFFFF", border: "1px solid #EBE8E0", borderRadius: 14, padding: 32 }}>
+                <div style={{ fontSize: 11.5, color: "#8A9199", fontWeight: 600, letterSpacing: 0.5, marginBottom: 14 }}>
+                  STEP 02 · 기능 선택
+                </div>
+                {featureGrid({ enabled: true, gap: 12 })}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
-                {visibleFeatures.map((f) => (
-                  <div
-                    key={f.key}
-                    onClick={() => goToFeature(f.href)}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
-                      padding: "14px",
-                      background: "#fff",
-                      border: "1px solid #EBE8E0",
-                      borderRadius: 10,
-                      cursor: uploads.length > 0 ? "pointer" : "not-allowed",
-                      opacity: uploads.length > 0 ? 1 : 0.5,
-                      transition: "border-color 0.12s",
-                    }}
-                    onMouseEnter={(e) => { if (uploads.length > 0) (e.currentTarget as HTMLElement).style.borderColor = "#3B5BFF"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#EBE8E0"; }}
-                  >
-                    <div style={{ width: 30, height: 30, borderRadius: 8, background: f.tint, color: f.ink, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: 12, flexShrink: 0 }}>
-                      {f.icon}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{f.label}</div>
-                      <div style={{ fontSize: 11, color: "#8A9199", marginTop: 2, lineHeight: 1.4 }}>{f.desc}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {!showAll && FEATURES.length > 4 && (
-                <button
-                  onClick={() => setShowAll(true)}
-                  style={{ background: "none", border: "none", fontSize: 12, color: "#8A9199", padding: "8px 0 0", cursor: "pointer", fontFamily: "inherit", width: "100%", textAlign: "center" }}
-                >
-                  + {FEATURES.length - 4}개 더 보기
-                </button>
-              )}
-            </div>
-          </div>
+            </>
+          )}
         </div>
 
         {/* KPI 카드 */}
         <div className="grid-3" style={{ marginBottom: 20 }}>
-          {/* 이번달 작업 수 */}
           <div style={{ background: "#FFFFFF", border: "1px solid #EBE8E0", borderRadius: 14, padding: "20px 24px" }}>
             <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>이번달 작업</div>
             {loadingData ? (
@@ -263,7 +366,6 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* 처리 페이지 */}
           <div style={{ background: "#FFFFFF", border: "1px solid #EBE8E0", borderRadius: 14, padding: "20px 24px" }}>
             <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>처리 페이지</div>
             {loadingData ? (
@@ -276,7 +378,6 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* 이달의 주요 기능 */}
           <div style={{ background: "#FFFFFF", border: "1px solid #EBE8E0", borderRadius: 14, padding: "20px 24px" }}>
             <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 12 }}>이달의 주요 기능</div>
             {loadingData ? (
@@ -316,7 +417,6 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* 로딩 스켈레톤 */}
           {loadingData && (
             <>
               {[...Array(4)].map((_, i) => (
@@ -329,7 +429,6 @@ export default function HomePage() {
             </>
           )}
 
-          {/* 빈 상태 */}
           {!loadingData && (!recentJobs || recentJobs.length === 0) && (
             <div style={{ padding: "48px 20px", textAlign: "center" }}>
               <div style={{ fontSize: 28, marginBottom: 10 }}>📄</div>
@@ -338,37 +437,37 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* 실제 데이터 */}
-          {!loadingData && recentJobs && recentJobs.length > 0 && recentJobs.map((r, i) => {
-            const meta = MENU_META[r.menu] ?? { label: r.menu, bg: "#F1EEE6", fg: "#4A5259", href: "/home" };
-            return (
-              <div
-                key={r.job_id}
-                onClick={() => goToJob(r)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  padding: "12px 20px",
-                  borderBottom: i < recentJobs.length - 1 ? "1px solid #F1EEE6" : "none",
-                  cursor: "pointer",
-                  transition: "background 0.1s",
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#F1EEE6"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
-              >
-                <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: meta.bg, color: meta.fg, borderRadius: 999, fontSize: 11, fontWeight: 600, flexShrink: 0, minWidth: 52, justifyContent: "center" }}>
-                  {meta.label}
-                </span>
-                <div style={{ flex: 1, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.filename}
+          {!loadingData && recentJobs && recentJobs.length > 0 &&
+            recentJobs.map((r, i) => {
+              const meta = MENU_META[r.menu] ?? { label: r.menu, bg: "#F1EEE6", fg: "#4A5259", href: "/home" };
+              return (
+                <div
+                  key={r.job_id}
+                  onClick={() => goToJob(r)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "12px 20px",
+                    borderBottom: i < recentJobs.length - 1 ? "1px solid #F1EEE6" : "none",
+                    cursor: "pointer",
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#F1EEE6"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: meta.bg, color: meta.fg, borderRadius: 999, fontSize: 11, fontWeight: 600, flexShrink: 0, minWidth: 52, justifyContent: "center" }}>
+                    {meta.label}
+                  </span>
+                  <div style={{ flex: 1, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.filename}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "#8A9199", fontFamily: MONO, flexShrink: 0 }}>
+                    {relativeTime(r.timestamp)}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11.5, color: "#8A9199", fontFamily: MONO, flexShrink: 0 }}>
-                  {relativeTime(r.timestamp)}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
     </>
