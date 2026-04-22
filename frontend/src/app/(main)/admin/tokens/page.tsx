@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
 import { formatDate } from "@/lib/utils";
+import { CardHeader, CsvIcon } from "@/components/admin/CardHeader";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "/aidoc-api";
 const MONO = `"JetBrains Mono", monospace`;
@@ -163,30 +164,37 @@ export default function TokensPage() {
 
       {/* 월별 사용량 */}
       <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid #F1EEE6", display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>월별 사용량</div>
-          <div style={{ flex: 1 }} />
-          <select
-            className="select"
-            style={{ width: "auto", fontSize: 12 }}
-            value={tokenYear}
-            onChange={(e) => setTokenYear(e.target.value)}
-          >
-            {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}년</option>)}
-          </select>
-          <button className="btn btn-primary btn-sm" onClick={fetchTokenSummary}>조회</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => downloadCsv(
-            ["월", "요청 수", "사용자", "입력 토큰", "출력 토큰", "합계", "비용(USD)", "비용(KRW)"],
-            tokenMonths.map(m => {
-              const c = calcCost(m.input_tokens, m.output_tokens);
-              return [m.month, m.requests, m.unique_users, m.input_tokens, m.output_tokens, m.input_tokens + m.output_tokens, c.usd.toFixed(3), Math.round(c.krw)];
-            })
-          , `토큰월별_${tokenYear}.csv`)}>↓ CSV</button>
-        </div>
+        <CardHeader
+          title="월별 사용량"
+          filters={
+            <>
+              <select
+                className="select"
+                style={{ width: "auto", fontSize: 12 }}
+                value={tokenYear}
+                onChange={(e) => setTokenYear(e.target.value)}
+              >
+                {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}년</option>)}
+              </select>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                <button className="btn btn-secondary btn-sm" onClick={fetchTokenSummary}>조회</button>
+                <button className="btn btn-secondary btn-sm" style={{ display: "inline-flex", alignItems: "center" }} onClick={() => downloadCsv(
+                  ["월", "요청 수", "사용자", "입력 토큰", "출력 토큰", "합계", "비용(USD)", "비용(KRW)"],
+                  tokenMonths.map(m => {
+                    const c = calcCost(m.input_tokens, m.output_tokens);
+                    return [m.month, m.requests, m.unique_users, m.input_tokens, m.output_tokens, m.input_tokens + m.output_tokens, c.usd.toFixed(3), Math.round(c.krw)];
+                  })
+                , `토큰월별_${tokenYear}.csv`)}>
+                  <CsvIcon />CSV
+                </button>
+              </div>
+            </>
+          }
+        />
         {tokenMonths.length === 0 ? (
           <div style={{ padding: 60, textAlign: "center", color: "#8A9199", fontSize: 13 }}>데이터 없음</div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div style={{ maxHeight: 480, overflowY: "auto", overflowX: "auto" }}>
             <table className="admin-table" style={{ fontSize: 12.5 }}>
               <thead>
                 <tr>
@@ -249,45 +257,55 @@ export default function TokensPage() {
 
       {/* 상세 조회 */}
       <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid #F1EEE6", display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>상세 조회</div>
-          <div style={{ flex: 1 }} />
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>시작일</div>
-              <input type="date" className="input" style={{ width: "auto" }} value={tokenDateFrom} onChange={(e) => setTokenDateFrom(e.target.value)} />
-            </div>
-            <div>
-              <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>종료일</div>
-              <input type="date" className="input" style={{ width: "auto" }} value={tokenDateTo} onChange={(e) => setTokenDateTo(e.target.value)} />
-            </div>
-            <div>
-              <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>직번</div>
-              <input className="input" placeholder="전체" value={tokenFilterUser} onChange={(e) => setTokenFilterUser(e.target.value)} style={{ width: 110 }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>메뉴</div>
-              <select className="select" style={{ width: "auto" }} value={tokenFilterMenu} onChange={(e) => setTokenFilterMenu(e.target.value)}>
-                <option value="">전체</option>
-                <option value="내용추출">내용추출</option>
-                <option value="표추출">표추출</option>
-                <option value="요약">요약</option>
-                <option value="번역">번역</option>
-              </select>
-            </div>
-            <button className="btn btn-primary btn-sm" onClick={() => { setTokenPage(1); fetchTokenDetail(); }}>조회</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => downloadCsv(
-              ["시간", "직번", "이름", "메뉴", "파일", "페이지", "입력토큰", "출력토큰", "비용(USD)"],
-              tokenItems.map(e => { const c = calcCost(e.input_tokens, e.output_tokens); return [formatDate(e.timestamp), e.user_id, decodeName(e.user_name), e.menu, e.filename, e.page === -1 ? "전체" : e.page, e.input_tokens, e.output_tokens, c.usd.toFixed(4)]; })
-            , `토큰상세_${tokenDateFrom}_${tokenDateTo}.csv`)}>↓ CSV</button>
-          </div>
-        </div>
+        <CardHeader
+          title="상세 조회"
+          right={
+            tokenTotal > 0
+              ? <span style={{ fontSize: 12.5, color: "#8A9199" }}>{fmtNum(tokenTotal)}건</span>
+              : undefined
+          }
+          filters={
+            <>
+              <div>
+                <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>시작일</div>
+                <input type="date" className="input" style={{ width: "auto" }} value={tokenDateFrom} onChange={(e) => setTokenDateFrom(e.target.value)} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>종료일</div>
+                <input type="date" className="input" style={{ width: "auto" }} value={tokenDateTo} onChange={(e) => setTokenDateTo(e.target.value)} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>직번</div>
+                <input className="input" placeholder="전체" value={tokenFilterUser} onChange={(e) => setTokenFilterUser(e.target.value)} style={{ width: 110 }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>메뉴</div>
+                <select className="select" style={{ width: "auto" }} value={tokenFilterMenu} onChange={(e) => setTokenFilterMenu(e.target.value)}>
+                  <option value="">전체</option>
+                  <option value="내용추출">내용추출</option>
+                  <option value="표추출">표추출</option>
+                  <option value="요약">요약</option>
+                  <option value="번역">번역</option>
+                </select>
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setTokenPage(1); fetchTokenDetail(); }}>조회</button>
+                <button className="btn btn-secondary btn-sm" style={{ display: "inline-flex", alignItems: "center" }} onClick={() => downloadCsv(
+                  ["시간", "직번", "이름", "메뉴", "파일", "페이지", "입력토큰", "출력토큰", "비용(USD)"],
+                  tokenItems.map(e => { const c = calcCost(e.input_tokens, e.output_tokens); return [formatDate(e.timestamp), e.user_id, decodeName(e.user_name), e.menu, e.filename, e.page === -1 ? "전체" : e.page, e.input_tokens, e.output_tokens, c.usd.toFixed(4)]; })
+                , `토큰상세_${tokenDateFrom}_${tokenDateTo}.csv`)}>
+                  <CsvIcon />CSV
+                </button>
+              </div>
+            </>
+          }
+        />
         {tokenLoading ? (
           <div style={{ padding: 60, textAlign: "center", color: "#8A9199", fontSize: 13 }}>조회 중...</div>
         ) : tokenItems.length === 0 ? (
           <div style={{ padding: 60, textAlign: "center", color: "#8A9199", fontSize: 13 }}>데이터 없음</div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div style={{ maxHeight: 480, overflowY: "auto", overflowX: "auto" }}>
             <table className="admin-table" style={{ fontSize: 12.5 }}>
               <thead>
                 <tr>

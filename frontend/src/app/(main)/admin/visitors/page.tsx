@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
+import { CardHeader, CsvIcon } from "@/components/admin/CardHeader";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "/aidoc-api";
 const MONO = `"JetBrains Mono", monospace`;
@@ -90,26 +91,37 @@ export default function VisitorsPage() {
       </div>
       <p style={{ color: "#8A9199", fontSize: 13.5, marginBottom: 24 }}>접속 통계 및 상세 방문 로그</p>
 
-      {/* Filter */}
-      <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: "14px 20px", marginBottom: 16, display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>시작일</div>
-          <input type="date" className="input" style={{ width: "auto" }} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </div>
-        <div>
-          <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>종료일</div>
-          <input type="date" className="input" style={{ width: "auto" }} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </div>
-        <button className="btn btn-primary btn-sm" onClick={fetchVisitors}>조회</button>
-        {visitorData && (
-          <button className="btn btn-secondary btn-sm" onClick={() => downloadCsv(
-            ["날짜", "시간", "직번", "이름", "IP", "경로"],
-            (visitorData.entries || []).map(e => {
-              const ts = e.timestamp; const d = ts.slice(0, 10); const t = ts.slice(11, 19);
-              return [d, t, e.user_id, decodeName(e.user_name), e.ip || "", e.path];
-            })
-          , `방문자로그_${dateFrom}_${dateTo}.csv`)}>↓ CSV 다운로드</button>
-        )}
+      {/* Filter card */}
+      <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
+        <CardHeader
+          title="조회 기간"
+          filters={
+            <>
+              <div>
+                <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>시작일</div>
+                <input type="date" className="input" style={{ width: "auto" }} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>종료일</div>
+                <input type="date" className="input" style={{ width: "auto" }} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                <button className="btn btn-secondary btn-sm" onClick={fetchVisitors}>조회</button>
+                {visitorData && (
+                  <button className="btn btn-secondary btn-sm" style={{ display: "inline-flex", alignItems: "center" }} onClick={() => downloadCsv(
+                    ["날짜", "시간", "직번", "이름", "IP", "경로"],
+                    (visitorData.entries || []).map(e => {
+                      const ts = e.timestamp; const d = ts.slice(0, 10); const t = ts.slice(11, 19);
+                      return [d, t, e.user_id, decodeName(e.user_name), e.ip || "", e.path];
+                    })
+                  , `방문자로그_${dateFrom}_${dateTo}.csv`)}>
+                    <CsvIcon />CSV
+                  </button>
+                )}
+              </div>
+            </>
+          }
+        />
       </div>
 
       {loading && (
@@ -156,9 +168,7 @@ export default function VisitorsPage() {
                         style={{
                           width: "100%",
                           height: `${Math.max(pct, 3)}%`,
-                          background: pct > 0
-                            ? `linear-gradient(to bottom, #3B5BFF, #7B8EFF)`
-                            : "#F1EEE6",
+                          background: pct > 0 ? `linear-gradient(to bottom, #3B5BFF, #7B8EFF)` : "#F1EEE6",
                           borderRadius: "3px 3px 0 0",
                           transition: "height 0.3s",
                         }}
@@ -203,12 +213,11 @@ export default function VisitorsPage() {
 
           {/* Detail log */}
           <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: "14px 20px", borderBottom: "1px solid #F1EEE6", display: "flex", alignItems: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>상세 로그</div>
-              <div style={{ flex: 1 }} />
-              <span style={{ fontSize: 12.5, color: "#8A9199" }}>{fmtNum(visitorData.total_visits)}건</span>
-            </div>
-            <div style={{ overflowX: "auto" }}>
+            <CardHeader
+              title="상세 로그"
+              right={<span style={{ fontSize: 12.5, color: "#8A9199" }}>{fmtNum(visitorData.total_visits)}건</span>}
+            />
+            <div style={{ maxHeight: 480, overflowY: "auto", overflowX: "auto" }}>
               <table className="admin-table">
                 <thead>
                   <tr>

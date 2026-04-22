@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import type { HistoryItem, AccessCheck } from "@/types";
+import { CardHeader, CsvIcon } from "@/components/admin/CardHeader";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "/aidoc-api";
 const MONO = `"JetBrains Mono", monospace`;
@@ -209,49 +210,55 @@ export default function HistoryPage() {
         <button className={`tab ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>권한 관리</button>
       </div>
 
-      {/* ── 작업 이력 ── */}
       {activeTab === "history" && (
         <>
-          <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: "14px 20px", marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-                <div>
-                  <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>시작일</div>
-                  <input type="date" className="input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ width: "auto" }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>종료일</div>
-                  <input type="date" className="input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ width: "auto" }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>직번</div>
-                  <input className="input" placeholder="전체" value={filterUser} onChange={(e) => setFilterUser(e.target.value)} style={{ width: 120 }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>이름</div>
-                  <input className="input" placeholder="전체" value={filterName} onChange={(e) => setFilterName(e.target.value)} style={{ width: 120 }} />
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn btn-primary btn-sm" onClick={() => { setPage(1); fetchHistory(); }}>조회</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => downloadCsv(
-                  ["시간", "직번", "이름", "메뉴", "작업", "상세"],
-                  items.map(it => [formatDate(it.timestamp), it.user_id, decodeName(it.user_name), it.menu, it.action, it.detail])
-                , `작업이력_${dateFrom}_${dateTo}.csv`)}>CSV 다운로드</button>
-              </div>
-            </div>
+          {/* Filter card */}
+          <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
+            <CardHeader
+              title="작업 이력 조회"
+              filters={
+                <>
+                  <div>
+                    <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>시작일</div>
+                    <input type="date" className="input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ width: "auto" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>종료일</div>
+                    <input type="date" className="input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ width: "auto" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>직번</div>
+                    <input className="input" placeholder="전체" value={filterUser} onChange={(e) => setFilterUser(e.target.value)} style={{ width: 120 }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11.5, color: "#8A9199", marginBottom: 4 }}>이름</div>
+                    <input className="input" placeholder="전체" value={filterName} onChange={(e) => setFilterName(e.target.value)} style={{ width: 120 }} />
+                  </div>
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setPage(1); fetchHistory(); }}>조회</button>
+                    <button className="btn btn-secondary btn-sm" style={{ display: "inline-flex", alignItems: "center" }} onClick={() => downloadCsv(
+                      ["시간", "직번", "이름", "메뉴", "작업", "상세"],
+                      items.map(it => [formatDate(it.timestamp), it.user_id, decodeName(it.user_name), it.menu, it.action, it.detail])
+                    , `작업이력_${dateFrom}_${dateTo}.csv`)}>
+                      <CsvIcon />CSV
+                    </button>
+                  </div>
+                </>
+              }
+            />
           </div>
 
           <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: "14px 20px", borderBottom: "1px solid #F1EEE6", display: "flex", alignItems: "center" }}>
-              <div style={{ fontSize: 13, color: "#8A9199" }}>총 {total}건</div>
-            </div>
+            <CardHeader
+              title="결과"
+              right={<span style={{ fontSize: 12.5, color: "#8A9199" }}>총 {total}건</span>}
+            />
             {loading ? (
               <div style={{ padding: 60, textAlign: "center", color: "#8A9199", fontSize: 13 }}>조회 중...</div>
             ) : items.length === 0 ? (
               <div style={{ padding: 60, textAlign: "center", color: "#8A9199", fontSize: 13 }}>이력이 없습니다.</div>
             ) : (
-              <div style={{ overflowX: "auto" }}>
+              <div style={{ maxHeight: 480, overflowY: "auto", overflowX: "auto" }}>
                 <table className="admin-table">
                   <thead>
                     <tr>

@@ -447,6 +447,9 @@ textarea:focus-visible {
   border-bottom: 1px solid var(--border);
   letter-spacing: 0.3px;
   text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 .admin-table td {
   padding: 10px 14px;
