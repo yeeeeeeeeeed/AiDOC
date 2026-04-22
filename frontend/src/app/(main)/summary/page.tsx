@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PdfUploader from "@/components/ui/PdfUploader";
 import PageSelector from "@/components/ui/PageSelector";
@@ -15,6 +15,32 @@ export default function SummaryPage() {
   return <Suspense><SummaryInner /></Suspense>;
 }
 
+function Toast({ message, visible }: { message: string; visible: boolean }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 32,
+        left: "50%",
+        transform: `translateX(-50%) translateY(${visible ? 0 : 12}px)`,
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.2s, transform 0.2s",
+        background: "#0F1419",
+        color: "#fff",
+        borderRadius: 8,
+        padding: "10px 18px",
+        fontSize: 13,
+        fontWeight: 500,
+        pointerEvents: "none",
+        zIndex: 9999,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
 function SummaryInner() {
   const searchParams = useSearchParams();
 
@@ -27,6 +53,8 @@ function SummaryInner() {
   const [progress, setProgress] = useState(0);
   const [summary, setSummary] = useState("");
   const [error, setError] = useState("");
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const jobs = searchParams.get("jobs");
@@ -46,6 +74,23 @@ function SummaryInner() {
       })
       .catch(() => clearSession(SESSION_KEY));
   }, [searchParams]);
+
+  const showToast = () => {
+    setToastVisible(true);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastVisible(false), 2000);
+  };
+
+  const handleChipClick = (t: string) => {
+    if (activePreset === t) {
+      setActivePreset("");
+      setCustomPrompt("");
+    } else {
+      setActivePreset(t);
+      setCustomPrompt(t);
+      showToast();
+    }
+  };
 
   const handleUploaded = (result: UploadResult) => {
     setUpload(result);
@@ -110,8 +155,14 @@ function SummaryInner() {
     { k: "detailed" as const, l: "상세", s: "1~2p" },
   ];
 
+  const PRESETS = ["계약서 핵심 조항만", "숫자·금액 중심", "실행 체크리스트"];
+
+  const ctaDisabled = processing || selectedPages.length === 0;
+
   return (
     <div>
+      <Toast message="빠른 지시가 적용되었습니다" visible={toastVisible} />
+
       {/* Page header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
         <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: -0.6, margin: 0 }}>문서 요약</h1>
@@ -126,7 +177,7 @@ function SummaryInner() {
       )}
 
       {upload && (
-        <>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* File chip */}
           <div
             style={{
@@ -134,7 +185,6 @@ function SummaryInner() {
               border: "1px solid #EBE8E0",
               borderRadius: 14,
               padding: "16px 20px",
-              marginBottom: 16,
               display: "flex",
               alignItems: "center",
               gap: 14,
@@ -153,151 +203,230 @@ function SummaryInner() {
             </button>
           </div>
 
-          {/* Main layout */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16 }}>
-            {/* Left column */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {upload.thumbnails.length > 0 && (
-                <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24 }}>
-                  <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>페이지 선택</div>
-                    <div style={{ flex: 1 }} />
-                    <div style={{ fontSize: 12, color: "#8A9199" }}>
-                      {selectedPages.length}/{upload.page_count} 선택
-                    </div>
-                  </div>
-                  <PageSelector
-                    thumbnails={upload.thumbnails}
-                    pageCount={upload.page_count}
-                    selectedPages={selectedPages}
-                    onSelectionChange={setSelectedPages}
-                  />
+          {/* Page selector */}
+          {upload.thumbnails.length > 0 && (
+            <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>페이지 선택</div>
+                <div style={{ flex: 1 }} />
+                <div style={{ fontSize: 12, color: "#8A9199" }}>
+                  {selectedPages.length}/{upload.page_count} 선택
                 </div>
-              )}
-
-              {processing && (
-                <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>요약 중...</span>
-                    <span style={{ fontSize: 12.5, color: "#8A9199" }}>{progress}%</span>
-                  </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${progress}%` }} />
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div style={{ background: "#FDEBE7", border: "1px solid #C8321E", borderRadius: 14, padding: 16, color: "#C8321E", fontSize: 13 }}>
-                  {error}
-                </div>
-              )}
-
-              {summary && (
-                <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>요약 결과</div>
-                    <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#E6F6EE", color: "#0E8F5C", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>완료</span>
-                    <div style={{ flex: 1 }} />
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => navigator.clipboard.writeText(summary)}
-                    >
-                      ⎘ 복사
-                    </button>
-                    <button className="btn btn-primary btn-sm" onClick={exportDocx}>
-                      ↓ 워드
-                    </button>
-                  </div>
-                  <MarkdownView content={summary} hideCopy />
-                </div>
-              )}
+              </div>
+              <PageSelector
+                thumbnails={upload.thumbnails}
+                pageCount={upload.page_count}
+                selectedPages={selectedPages}
+                onSelectionChange={setSelectedPages}
+              />
             </div>
+          )}
 
-            {/* Right column: options */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>요약 옵션</div>
+          {/* Options card */}
+          <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18 }}>요약 옵션</div>
 
+            {/* Upper row: length segment + preset chips */}
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 24, marginBottom: 16, alignItems: "start" }}>
+              {/* Length segment control */}
+              <div>
                 <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>요약 길이</div>
-                <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
-                  {LENGTH_OPTIONS.map((o) => (
-                    <div
+                <div style={{ display: "flex", gap: 0, border: "1px solid #EBE8E0", borderRadius: 8, overflow: "hidden" }}>
+                  {LENGTH_OPTIONS.map((o, idx) => (
+                    <button
                       key={o.k}
                       onClick={() => setLength(o.k)}
                       style={{
-                        flex: 1,
-                        padding: "10px 8px",
-                        borderRadius: 8,
+                        minWidth: 72,
+                        padding: "8px 10px",
                         textAlign: "center",
-                        border: length === o.k ? "1.5px solid #0F1419" : "1px solid #EBE8E0",
+                        border: "none",
+                        borderLeft: idx > 0 ? "1px solid #EBE8E0" : "none",
                         background: length === o.k ? "#0F1419" : "#fff",
                         color: length === o.k ? "#fff" : "#0F1419",
                         cursor: "pointer",
-                        transition: "all 0.12s",
+                        transition: "background 0.12s, color 0.12s",
+                        fontFamily: "inherit",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (length !== o.k) {
+                          const el = e.currentTarget;
+                          el.style.border = "1px solid rgba(15,20,25,0.4)";
+                          el.style.background = "rgba(15,20,25,0.04)";
+                          if (idx > 0) el.style.borderLeft = "1px solid rgba(15,20,25,0.4)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (length !== o.k) {
+                          const el = e.currentTarget;
+                          el.style.border = "none";
+                          el.style.background = "#fff";
+                          if (idx > 0) el.style.borderLeft = "1px solid #EBE8E0";
+                        }
                       }}
                     >
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{o.l}</div>
-                      <div style={{ fontSize: 10.5, opacity: 0.7, marginTop: 2 }}>{o.s}</div>
-                    </div>
+                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>{o.l}</div>
+                      <div style={{ fontSize: 10.5, opacity: 0.65, marginTop: 2 }}>{o.s}</div>
+                    </button>
                   ))}
                 </div>
+              </div>
 
-                {/* 빠른 지시 칩 */}
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>빠른 지시</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {["계약서 핵심 조항만", "숫자·금액 중심", "실행 체크리스트"].map((t) => {
-                      const active = activePreset === t;
-                      return (
-                        <button
-                          key={t}
-                          onClick={() => {
-                            setCustomPrompt(t);
-                            setActivePreset(t);
-                          }}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: 999,
-                            border: active ? "2px solid #3B5BFF" : "1px solid #EBE8E0",
-                            background: active ? "#EEF1FF" : "#FAFAF7",
-                            fontSize: 11.5,
-                            color: active ? "#2740C7" : "#4A5259",
-                            cursor: "pointer",
-                            fontFamily: "inherit",
-                            transition: "border-color 0.12s, color 0.12s, background 0.12s",
-                          }}
-                          onMouseEnter={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#3B5BFF"; el.style.color = "#3B5BFF"; } }}
-                          onMouseLeave={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#EBE8E0"; el.style.color = "#4A5259"; } }}
-                        >
-                          {t}
-                        </button>
-                      );
-                    })}
-                  </div>
+              {/* Preset chips */}
+              <div>
+                <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>빠른 지시</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {PRESETS.map((t) => {
+                    const active = activePreset === t;
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => handleChipClick(t)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          border: active ? "2px solid #3B5BFF" : "1px solid #EBE8E0",
+                          background: active ? "#EEF1FF" : "#FAFAF7",
+                          fontSize: 11.5,
+                          color: active ? "#2740C7" : "#4A5259",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          transition: "border-color 0.12s, color 0.12s, background 0.12s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!active) {
+                            const el = e.currentTarget;
+                            el.style.borderColor = "#3B5BFF";
+                            el.style.color = "#3B5BFF";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!active) {
+                            const el = e.currentTarget;
+                            el.style.borderColor = "#EBE8E0";
+                            el.style.color = "#4A5259";
+                          }
+                        }}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
                 </div>
-
-                <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>추가 지시 (선택)</div>
-                <textarea
-                  className="textarea"
-                  placeholder="예) 계약 조건과 숫자 데이터 위주로 요약, bullet 형식 선호"
-                  value={customPrompt}
-                  onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
-                  style={{ minHeight: 80, fontSize: 12.5 }}
-                />
-
-                <button
-                  className="btn btn-accent btn-block"
-                  style={{ marginTop: 16 }}
-                  onClick={startSummary}
-                  disabled={processing || selectedPages.length === 0}
-                >
-                  {processing ? "요약 중..." : `✨ 요약 시작 · ${selectedPages.length}페이지`}
-                </button>
               </div>
             </div>
+
+            {/* Textarea */}
+            <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>추가 지시 (선택)</div>
+            <textarea
+              className="textarea"
+              placeholder="예) 계약 조건과 숫자 데이터 위주로 요약, bullet 형식 선호"
+              value={customPrompt}
+              onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
+              style={{ minHeight: 80, fontSize: 12.5 }}
+            />
+
+            {/* CTA — right-aligned */}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <button
+                onClick={startSummary}
+                disabled={ctaDisabled}
+                style={{
+                  padding: "10px 24px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: ctaDisabled ? "#EBE8E0" : "#3B5BFF",
+                  color: ctaDisabled ? "#8A9199" : "#fff",
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: ctaDisabled ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                  transition: "background 0.12s, color 0.12s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {processing
+                  ? "요약 중..."
+                  : selectedPages.length === 0
+                  ? "페이지를 선택하세요"
+                  : `요약 시작 · ${selectedPages.length}페이지`}
+              </button>
+            </div>
           </div>
-        </>
+
+          {/* Progress */}
+          {processing && (
+            <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>요약 중...</span>
+                <span style={{ fontSize: 12.5, color: "#8A9199" }}>{progress}%</span>
+              </div>
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div style={{ background: "#FDEBE7", border: "1px solid #C8321E", borderRadius: 14, padding: 16, color: "#C8321E", fontSize: 13 }}>
+              {error}
+            </div>
+          )}
+
+          {/* Result or placeholder */}
+          {summary ? (
+            <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, overflow: "hidden" }}>
+              <div
+                style={{
+                  padding: "16px 24px",
+                  borderBottom: "1px solid #F1EEE6",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 600 }}>요약 결과</div>
+                <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#E6F6EE", color: "#0E8F5C", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>완료</span>
+                <div style={{ flex: 1 }} />
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => navigator.clipboard.writeText(summary)}
+                >
+                  ⎘ 복사
+                </button>
+                <button className="btn btn-primary btn-sm" onClick={exportDocx}>
+                  ↓ 워드
+                </button>
+              </div>
+              <div style={{ padding: 24 }}>
+                <MarkdownView content={summary} hideCopy />
+              </div>
+            </div>
+          ) : !processing && (
+            <div
+              style={{
+                border: "1px dashed #EBE8E0",
+                borderRadius: 14,
+                padding: 48,
+                minHeight: 200,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              <div style={{ fontSize: 24, color: "#8A9199", lineHeight: 1 }}>≡</div>
+              <div style={{ fontSize: 13, color: "#8A9199", textAlign: "center" }}>
+                페이지를 선택하고 요약을 시작하면 결과가 여기에 표시됩니다
+              </div>
+              <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: "#F1EEE6", color: "#8A9199", borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>
+                대기
+              </span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
