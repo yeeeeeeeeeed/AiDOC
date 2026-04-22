@@ -150,12 +150,11 @@ export default function ComparePage() {
 
       {uploadA && uploadB && (
         <>
-          <div
-            style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}
-          >
-            {/* 빠른 지시 칩 */}
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>빠른 지시</div>
+          <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18 }}>비교 옵션</div>
+
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>빠른 지시</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {["변경 항목만 추출", "추가·삭제 구분 표시", "조항 번호 기준 정렬"].map((t) => {
                   const active = activePreset === t;
@@ -169,21 +168,36 @@ export default function ComparePage() {
                 })}
               </div>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>추가 지시 (선택)</div>
-            <textarea
-              className="textarea"
-              placeholder="예: 단가 변경만 비교, 조항 변경 위주로 분석..."
-              value={customPrompt}
-              onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
-              style={{ fontSize: 13 }}
-            />
+
+            <div>
+              <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>추가 지시 (선택)</div>
+              <textarea
+                className="textarea"
+                placeholder="예: 단가 변경만 비교, 조항 변경 위주로 분석..."
+                value={customPrompt}
+                onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
+                style={{ minHeight: 80, fontSize: 12.5 }}
+              />
+            </div>
           </div>
 
           <button
-            className="btn btn-accent btn-block"
-            style={{ marginBottom: 16 }}
             onClick={startCompare}
             disabled={processing}
+            style={{
+              width: "100%",
+              padding: "14px 24px",
+              borderRadius: 10,
+              border: "none",
+              background: processing ? "#EBE8E0" : "#3B5BFF",
+              color: processing ? "#8A9199" : "#fff",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: processing ? "not-allowed" : "pointer",
+              fontFamily: "inherit",
+              transition: "background 0.12s, color 0.12s",
+              marginBottom: 16,
+            }}
           >
             {processing ? "비교 중..." : "비교 시작"}
           </button>

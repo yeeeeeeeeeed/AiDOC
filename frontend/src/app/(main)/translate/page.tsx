@@ -205,7 +205,7 @@ function TranslateInner() {
               background: "#fff",
               border: "1px solid #EBE8E0",
               borderRadius: 14,
-              padding: "14px 20px",
+              padding: "16px 20px",
               marginBottom: 16,
               display: "flex",
               alignItems: "center",
@@ -216,7 +216,7 @@ function TranslateInner() {
             <div className="pdf-icon">PDF</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{upload.filename}</div>
-              <div style={{ fontSize: 11.5, color: "#8A9199", marginTop: 2 }}>{upload.page_count}페이지</div>
+              <div style={{ fontSize: 12, color: "#8A9199", marginTop: 2 }}>{upload.page_count}페이지</div>
             </div>
             <div
               style={{
@@ -260,40 +260,35 @@ function TranslateInner() {
                 </div>
               )}
 
-              <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>번역 옵션</div>
-                <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>원문 언어</div>
-                    <select className="select" value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}>
-                      {LANGUAGES.map((l) => (
-                        <option key={l.value} value={l.value}>{l.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-end",
-                      paddingBottom: 2,
-                      color: "#8A9199",
-                      fontSize: 18,
-                    }}
-                  >
-                    →
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>번역 대상 언어</div>
-                    <select className="select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
-                      {TARGET_LANGUAGES.map((l) => (
-                        <option key={l.value} value={l.value}>{l.label}</option>
-                      ))}
-                    </select>
+              <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18 }}>번역 옵션</div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>원문 언어</div>
+                      <select className="select" value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}>
+                        {LANGUAGES.map((l) => (
+                          <option key={l.value} value={l.value}>{l.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: 2, color: "#8A9199", fontSize: 18 }}>
+                      →
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>번역 대상 언어</div>
+                      <select className="select" value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
+                        {TARGET_LANGUAGES.map((l) => (
+                          <option key={l.value} value={l.value}>{l.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
-                {/* 빠른 지시 칩 */}
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>빠른 지시</div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>빠른 지시</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {["기술 용어 영문 병기", "경어체 유지", "단락 구조 그대로"].map((t) => {
                       const active = activePreset === t;
@@ -307,23 +302,38 @@ function TranslateInner() {
                     })}
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>추가 지시 (선택)</div>
-                <textarea
-                  className="textarea"
-                  placeholder="예: 기술 용어는 영문 병기, 표는 원문 유지..."
-                  value={customPrompt}
-                  onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
-                  style={{ fontSize: 13 }}
-                />
+
+                <div>
+                  <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>추가 지시 (선택)</div>
+                  <textarea
+                    className="textarea"
+                    placeholder="예: 기술 용어는 영문 병기, 표는 원문 유지..."
+                    value={customPrompt}
+                    onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
+                    style={{ minHeight: 80, fontSize: 12.5 }}
+                  />
+                </div>
               </div>
 
               <button
-                className="btn btn-accent btn-block"
-                style={{ marginBottom: 16 }}
                 onClick={startTranslate}
                 disabled={processing || selectedPages.length === 0}
+                style={{
+                  width: "100%",
+                  padding: "14px 24px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: (processing || selectedPages.length === 0) ? "#EBE8E0" : "#3B5BFF",
+                  color: (processing || selectedPages.length === 0) ? "#8A9199" : "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: (processing || selectedPages.length === 0) ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                  transition: "background 0.12s, color 0.12s",
+                  marginBottom: 16,
+                }}
               >
-                {processing ? "번역 중..." : `번역 시작 (${selectedPages.length}페이지)`}
+                {processing ? "번역 중..." : selectedPages.length === 0 ? "페이지를 선택하세요" : `번역 시작 · ${selectedPages.length}페이지`}
               </button>
             </>
           )}

@@ -226,133 +226,109 @@ function SummaryInner() {
           <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24 }}>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18 }}>요약 옵션</div>
 
-            {/* Upper row: length segment + preset chips */}
-            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 24, marginBottom: 16, alignItems: "start" }}>
-              {/* Length segment control */}
-              <div>
-                <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>요약 길이</div>
-                <div style={{ display: "flex", gap: 0, border: "1px solid #EBE8E0", borderRadius: 8, overflow: "hidden" }}>
-                  {LENGTH_OPTIONS.map((o, idx) => (
-                    <button
-                      key={o.k}
-                      onClick={() => setLength(o.k)}
-                      style={{
-                        minWidth: 72,
-                        padding: "8px 10px",
-                        textAlign: "center",
-                        border: "none",
-                        borderLeft: idx > 0 ? "1px solid #EBE8E0" : "none",
-                        background: length === o.k ? "#0F1419" : "#fff",
-                        color: length === o.k ? "#fff" : "#0F1419",
-                        cursor: "pointer",
-                        transition: "background 0.12s, color 0.12s",
-                        fontFamily: "inherit",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (length !== o.k) {
-                          const el = e.currentTarget;
-                          el.style.border = "1px solid rgba(15,20,25,0.4)";
-                          el.style.background = "rgba(15,20,25,0.04)";
-                          if (idx > 0) el.style.borderLeft = "1px solid rgba(15,20,25,0.4)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (length !== o.k) {
-                          const el = e.currentTarget;
-                          el.style.border = "none";
-                          el.style.background = "#fff";
-                          if (idx > 0) el.style.borderLeft = "1px solid #EBE8E0";
-                        }
-                      }}
-                    >
-                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>{o.l}</div>
-                      <div style={{ fontSize: 10.5, opacity: 0.65, marginTop: 2 }}>{o.s}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Preset chips */}
-              <div>
-                <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>빠른 지시</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {PRESETS.map((t) => {
-                    const active = activePreset === t;
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => handleChipClick(t)}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 999,
-                          border: active ? "2px solid #3B5BFF" : "1px solid #EBE8E0",
-                          background: active ? "#EEF1FF" : "#FAFAF7",
-                          fontSize: 11.5,
-                          color: active ? "#2740C7" : "#4A5259",
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          transition: "border-color 0.12s, color 0.12s, background 0.12s",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!active) {
-                            const el = e.currentTarget;
-                            el.style.borderColor = "#3B5BFF";
-                            el.style.color = "#3B5BFF";
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!active) {
-                            const el = e.currentTarget;
-                            el.style.borderColor = "#EBE8E0";
-                            el.style.color = "#4A5259";
-                          }
-                        }}
-                      >
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
+            {/* 요약 길이 */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>요약 길이</div>
+              <div style={{ display: "inline-flex", border: "1px solid #EBE8E0", borderRadius: 8, overflow: "hidden" }}>
+                {LENGTH_OPTIONS.map((o, idx) => (
+                  <button
+                    key={o.k}
+                    onClick={() => setLength(o.k)}
+                    style={{
+                      minWidth: 72,
+                      padding: "8px 10px",
+                      textAlign: "center",
+                      border: "none",
+                      borderLeft: idx > 0 ? "1px solid #EBE8E0" : "none",
+                      background: length === o.k ? "#0F1419" : "#fff",
+                      color: length === o.k ? "#fff" : "#0F1419",
+                      cursor: "pointer",
+                      transition: "background 0.12s, color 0.12s",
+                      fontFamily: "inherit",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (length !== o.k) {
+                        const el = e.currentTarget;
+                        el.style.background = "rgba(15,20,25,0.04)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (length !== o.k) {
+                        e.currentTarget.style.background = "#fff";
+                      }
+                    }}
+                  >
+                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{o.l}</div>
+                    <div style={{ fontSize: 10.5, opacity: 0.65, marginTop: 2 }}>{o.s}</div>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Textarea */}
-            <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>추가 지시 (선택)</div>
-            <textarea
-              className="textarea"
-              placeholder="예) 계약 조건과 숫자 데이터 위주로 요약, bullet 형식 선호"
-              value={customPrompt}
-              onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
-              style={{ minHeight: 80, fontSize: 12.5 }}
-            />
+            {/* 빠른 지시 */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>빠른 지시</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {PRESETS.map((t) => {
+                  const active = activePreset === t;
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => handleChipClick(t)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        border: active ? "2px solid #3B5BFF" : "1px solid #EBE8E0",
+                        background: active ? "#EEF1FF" : "#FAFAF7",
+                        fontSize: 11.5,
+                        color: active ? "#2740C7" : "#4A5259",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        transition: "border-color 0.12s, color 0.12s, background 0.12s",
+                      }}
+                      onMouseEnter={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#3B5BFF"; el.style.color = "#3B5BFF"; } }}
+                      onMouseLeave={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#EBE8E0"; el.style.color = "#4A5259"; } }}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-            {/* CTA — right-aligned */}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-              <button
-                onClick={startSummary}
-                disabled={ctaDisabled}
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: ctaDisabled ? "#EBE8E0" : "#3B5BFF",
-                  color: ctaDisabled ? "#8A9199" : "#fff",
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  cursor: ctaDisabled ? "not-allowed" : "pointer",
-                  fontFamily: "inherit",
-                  transition: "background 0.12s, color 0.12s",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {processing
-                  ? "요약 중..."
-                  : selectedPages.length === 0
-                  ? "페이지를 선택하세요"
-                  : `요약 시작 · ${selectedPages.length}페이지`}
-              </button>
+            {/* 추가 지시 */}
+            <div>
+              <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>추가 지시 (선택)</div>
+              <textarea
+                className="textarea"
+                placeholder="예) 계약 조건과 숫자 데이터 위주로 요약, bullet 형식 선호"
+                value={customPrompt}
+                onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
+                style={{ minHeight: 80, fontSize: 12.5 }}
+              />
             </div>
           </div>
+
+          {/* 풀폭 CTA */}
+          <button
+            onClick={startSummary}
+            disabled={ctaDisabled}
+            style={{
+              width: "100%",
+              padding: "14px 24px",
+              borderRadius: 10,
+              border: "none",
+              background: ctaDisabled ? "#EBE8E0" : "#3B5BFF",
+              color: ctaDisabled ? "#8A9199" : "#fff",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: ctaDisabled ? "not-allowed" : "pointer",
+              fontFamily: "inherit",
+              transition: "background 0.12s, color 0.12s",
+            }}
+          >
+            {processing ? "요약 중..." : selectedPages.length === 0 ? "페이지를 선택하세요" : `요약 시작 · ${selectedPages.length}페이지`}
+          </button>
 
           {/* Progress */}
           {processing && (
