@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import PdfUploader from "@/components/ui/PdfUploader";
 import PageSelector from "@/components/ui/PageSelector";
@@ -18,9 +18,9 @@ export default function TableExtractPage() {
 
 function Stepper({ step }: { step: number }) {
   const steps = [
-    { label: "업로드", desc: "PDF 선택" },
+    { label: "업로드",    desc: "PDF 선택" },
     { label: "페이지 선택", desc: "범위 지정" },
-    { label: "추출", desc: "표 감지 · 변환" },
+    { label: "추출 미리보기", desc: "표 감지 · 변환" },
   ];
   return (
     <div
@@ -32,16 +32,25 @@ function Stepper({ step }: { step: number }) {
         marginBottom: 16,
         display: "flex",
         alignItems: "center",
-        gap: 0,
+        minWidth: 0,
       }}
     >
       {steps.map((s, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", flex: i < steps.length - 1 ? 1 : 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <React.Fragment key={i}>
+          {/* Step item — flex:none so it always sizes to content */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flex: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
             <div
               style={{
-                width: 26,
-                height: 26,
+                width: 28,
+                height: 28,
                 borderRadius: "50%",
                 background: i < step ? "#0E8F5C" : i === step ? "#3B5BFF" : "#EBE8E0",
                 color: i <= step ? "#fff" : "#8A9199",
@@ -49,21 +58,30 @@ function Stepper({ step }: { step: number }) {
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 11,
-                fontWeight: 600,
+                fontWeight: 700,
                 flexShrink: 0,
               }}
             >
               {i < step ? "✓" : i + 1}
             </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: i <= step ? "#0F1419" : "#8A9199" }}>{s.label}</div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{
+                fontSize: 13.5,
+                fontWeight: 500,
+                color: i <= step ? "#0F1419" : "#8A9199",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}>
+                {s.label}
+              </div>
               <div style={{ fontSize: 11.5, color: "#8A9199" }}>{s.desc}</div>
             </div>
           </div>
+          {/* Connector — only between items, flex:1 to fill space */}
           {i < steps.length - 1 && (
-            <div style={{ flex: 1, height: 1, background: "#EBE8E0", margin: "0 16px" }} />
+            <div style={{ flex: 1, height: 1, background: "#EBE8E0", margin: "0 16px", minWidth: 24 }} />
           )}
-        </div>
+        </React.Fragment>
       ))}
     </div>
   );
