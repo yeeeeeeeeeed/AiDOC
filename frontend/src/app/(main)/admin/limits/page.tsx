@@ -14,8 +14,6 @@ interface UserLimit {
   dept: string;
   used: number;
   limit: number;
-  daily_limit: number;
-  today: number;
   status: LimitStatus;
   auto_block: boolean;
   updated_at: string | null;
@@ -51,21 +49,19 @@ function SkeletonRow() {
 interface EditModalProps {
   user: UserLimit;
   onClose: () => void;
-  onSave: (userId: string, patch: { limit: number; daily_limit: number; auto_block: boolean }) => Promise<void>;
+  onSave: (userId: string, patch: { limit: number; auto_block: boolean }) => Promise<void>;
 }
 
 function EditModal({ user, onClose, onSave }: EditModalProps) {
-  const [limit,      setLimit]      = useState(String(user.limit));
-  const [dailyLimit, setDailyLimit] = useState(String(user.daily_limit));
-  const [autoBlock,  setAutoBlock]  = useState(user.auto_block);
-  const [saving,     setSaving]     = useState(false);
+  const [limit,     setLimit]     = useState(String(user.limit));
+  const [autoBlock, setAutoBlock] = useState(user.auto_block);
+  const [saving,    setSaving]    = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
     await onSave(user.id, {
-      limit:       Number(limit)      || user.limit,
-      daily_limit: Number(dailyLimit) || user.daily_limit,
-      auto_block:  autoBlock,
+      limit:      Number(limit) || user.limit,
+      auto_block: autoBlock,
     });
     onClose();
   };
@@ -106,21 +102,6 @@ function EditModal({ user, onClose, onSave }: EditModalProps) {
             </div>
           </div>
 
-          {/* 일 토큰 한도 */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>일 토큰 한도</div>
-            <input
-              className="input"
-              type="number"
-              value={dailyLimit}
-              onChange={(e) => setDailyLimit(e.target.value)}
-              placeholder="예: 100000"
-            />
-            <div style={{ fontSize: 11.5, color: "#8A9199", marginTop: 4 }}>
-              오늘 사용: {fmtNum(user.today)}
-            </div>
-          </div>
-
           {/* 자동 차단 토글 */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0" }}>
             <div>
@@ -156,7 +137,6 @@ export default function LimitsPage() {
   const [access,       setAccess]       = useState<{ is_admin: boolean } | null>(null);
   const [users,        setUsers]        = useState<UserLimit[]>([]);
   const [defaultLimit, setDefaultLimit] = useState(500_000);
-  const [defaultDaily, setDefaultDaily] = useState(50_000);
   const [loading,      setLoading]      = useState(true);
   const [editing,      setEditing]      = useState<UserLimit | null>(null);
 
@@ -168,11 +148,10 @@ export default function LimitsPage() {
   const fetchLimits = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.get<{ default_limit: number; default_daily_limit: number; users: UserLimit[] }>(
+      const data = await api.get<{ default_limit: number; users: UserLimit[] }>(
         "/api/admin/limits"
       );
       setDefaultLimit(data.default_limit);
-      setDefaultDaily(data.default_daily_limit);
       setUsers(data.users);
     } catch {
       setUsers([]);
@@ -188,7 +167,7 @@ export default function LimitsPage() {
 
   const handleSave = async (
     userId: string,
-    patch: { limit: number; daily_limit: number; auto_block: boolean }
+    patch: { limit: number; auto_block: boolean }
   ) => {
     await fetch(`${BACKEND}/api/admin/limits/${userId}`, {
       method: "PATCH",
@@ -265,9 +244,6 @@ export default function LimitsPage() {
           <div style={{ fontSize: 12.5, color: "#4A5259", background: "#F5F2EB", borderRadius: 8, padding: "8px 14px" }}>
             기본 월 한도: <strong style={{ fontFamily: MONO }}>{fmtNum(defaultLimit)}</strong> 토큰
           </div>
-          <div style={{ fontSize: 12.5, color: "#4A5259", background: "#F5F2EB", borderRadius: 8, padding: "8px 14px" }}>
-            기본 일 한도: <strong style={{ fontFamily: MONO }}>{fmtNum(defaultDaily)}</strong> 토큰
-          </div>
         </div>
 
         {/* Users table */}
@@ -308,7 +284,6 @@ export default function LimitsPage() {
                   <th>이름</th>
                   <th>부서</th>
                   <th>이번 달 사용 / 한도</th>
-                  <th style={{ textAlign: "right" }}>오늘 사용</th>
                   <th>상태</th>
                   <th>자동차단</th>
                   <th>액션</th>
@@ -333,9 +308,6 @@ export default function LimitsPage() {
                             {fmtK(u.used)} / {fmtK(u.limit)}
                           </span>
                         </div>
-                      </td>
-                      <td style={{ textAlign: "right", fontFamily: MONO, fontSize: 12, color: u.today > 0 ? "#0F1419" : "#8A9199" }}>
-                        {u.today > 0 ? fmtK(u.today) : "—"}
                       </td>
                       <td>
                         <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", background: s.bg, color: s.color, borderRadius: 999, fontSize: 11.5, fontWeight: 500 }}>

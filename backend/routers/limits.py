@@ -20,7 +20,6 @@ _LOCK = threading.RLock()
 
 _DEFAULT: dict = {
     "default_limit": 500_000,
-    "default_daily_limit": 50_000,
     "users": {},
 }
 
@@ -35,7 +34,6 @@ def _read_limits() -> dict:
         with open(LIMITS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         data.setdefault("default_limit", _DEFAULT["default_limit"])
-        data.setdefault("default_daily_limit", _DEFAULT["default_daily_limit"])
         data.setdefault("users", {})
         return data
     except Exception:
@@ -106,27 +104,20 @@ def check_user_limit(user_id: str) -> str | None:
     with _LOCK:
         ldata = _read_limits()
 
-    default_limit       = ldata["default_limit"]
-    default_daily_limit = ldata["default_daily_limit"]
-    cfg         = ldata["users"].get(user_id, {})
-    limit       = cfg.get("limit", default_limit)
-    daily_limit = cfg.get("daily_limit") or default_daily_limit
-    auto_block  = cfg.get("auto_block", False)
-    man_blocked = cfg.get("blocked", False)
+    default_limit = ldata["default_limit"]
+    cfg           = ldata["users"].get(user_id, {})
+    limit         = cfg.get("limit", default_limit)
+    auto_block    = cfg.get("auto_block", False)
+    man_blocked   = cfg.get("blocked", False)
 
     if man_blocked:
         return "관리자에 의해 차단된 계정입니다. 관리자에게 문의하세요."
 
     entries = _read_token_logs(month_from, month_to)
-    monthly = 0
-    today   = 0
-    for e in entries:
-        if e.get("user_id") != user_id:
-            continue
-        tokens  = e.get("input_tokens", 0) + e.get("output_tokens", 0)
-        monthly += tokens
-        if e.get("timestamp", "")[:10] == today_str:
-            today += tokens
+    monthly = sum(
+        e.get("input_tokens", 0) + e.get("output_tokens", 0)
+        for e in entries if e.get("user_id") == user_id
+    )
 
     if auto_block and limit > 0 and monthly >= limit:
         return f"이번 달 토큰 한도({monthly:,} / {limit:,})를 초과했습니다. 관리자에게 문의하세요."
@@ -145,13 +136,11 @@ def get_limits(request: Request):
     now = datetime.now()
     month_from = now.strftime("%Y-%m-01")
     month_to   = now.strftime("%Y-%m-%d")
-    today_str  = now.strftime("%Y-%m-%d")
 
     # 이번 달 토큰 로그
     entries = _read_token_logs(month_from, month_to)
 
     monthly_usage: dict[str, int] = {}
-    today_usage:   dict[str, int] = {}
     user_names:    dict[str, str] = {}
 
     for e in entries:
@@ -160,17 +149,14 @@ def get_limits(request: Request):
             continue
         tokens = e.get("input_tokens", 0) + e.get("output_tokens", 0)
         monthly_usage[uid] = monthly_usage.get(uid, 0) + tokens
-        if e.get("timestamp", "")[:10] == today_str:
-            today_usage[uid] = today_usage.get(uid, 0) + tokens
         if uid not in user_names and e.get("user_name"):
             user_names[uid] = e["user_name"]
 
     with _LOCK:
         ldata = _read_limits()
 
-    default_limit       = ldata["default_limit"]
-    default_daily_limit = ldata["default_daily_limit"]
-    users_cfg           = ldata["users"]
+    default_limit = ldata["default_limit"]
+    users_cfg     = ldata["users"]
 
     all_uids = set(monthly_usage) | set(users_cfg)
 
@@ -181,39 +167,33 @@ def get_limits(request: Request):
 
     result = []
     for uid in sorted(all_uids):
-        cfg           = users_cfg.get(uid, {})
-        limit         = cfg.get("limit", default_limit)
-        daily_limit   = cfg.get("daily_limit") or default_daily_limit
-        auto_block    = cfg.get("auto_block", False)
-        man_blocked   = cfg.get("blocked", False)
-        used          = monthly_usage.get(uid, 0)
-        today         = today_usage.get(uid, 0)
+        cfg         = users_cfg.get(uid, {})
+        limit       = cfg.get("limit", default_limit)
+        auto_block  = cfg.get("auto_block", False)
+        man_blocked = cfg.get("blocked", False)
+        used        = monthly_usage.get(uid, 0)
 
         result.append({
-            "id":          uid,
-            "nm":          _decode_name(user_names.get(uid, "")),
-            "dept":        cfg.get("dept", ""),
-            "used":        used,
-            "limit":       limit,
-            "daily_limit": daily_limit,
-            "today":       today,
-            "status":      _compute_status(used, limit, man_blocked, auto_block),
-            "auto_block":  auto_block,
-            "updated_at":  cfg.get("updated_at"),
-            "updated_by":  cfg.get("updated_by"),
+            "id":         uid,
+            "nm":         _decode_name(user_names.get(uid, "")),
+            "dept":       cfg.get("dept", ""),
+            "used":       used,
+            "limit":      limit,
+            "status":     _compute_status(used, limit, man_blocked, auto_block),
+            "auto_block": auto_block,
+            "updated_at": cfg.get("updated_at"),
+            "updated_by": cfg.get("updated_by"),
         })
 
     return {
-        "default_limit":       default_limit,
-        "default_daily_limit": default_daily_limit,
-        "users":               result,
+        "default_limit": default_limit,
+        "users":         result,
     }
 
 
 class LimitPatch(BaseModel):
-    limit:       Optional[int]  = None
-    daily_limit: Optional[int]  = None
-    auto_block:  Optional[bool] = None
+    limit:      Optional[int]  = None
+    auto_block: Optional[bool] = None
 
 
 @router.patch("/limits/{user_id}")
@@ -233,9 +213,8 @@ def patch_limit(user_id: str, body: LimitPatch, request: Request):
         data = _read_limits()
         cfg  = data["users"].setdefault(user_id, {})
 
-        if body.limit       is not None: cfg["limit"]       = body.limit
-        if body.daily_limit is not None: cfg["daily_limit"] = body.daily_limit
-        if body.auto_block  is not None: cfg["auto_block"]  = body.auto_block
+        if body.limit      is not None: cfg["limit"]      = body.limit
+        if body.auto_block is not None: cfg["auto_block"] = body.auto_block
 
         cfg["updated_at"] = _now_kst()
         cfg["updated_by"] = admin_id
