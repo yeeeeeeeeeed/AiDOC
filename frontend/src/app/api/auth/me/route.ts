@@ -19,5 +19,8 @@ export async function GET() {
     return NextResponse.json({ error: "세션 만료" }, { status: 401 });
   }
 
-  return NextResponse.json(user);
+  const res = NextResponse.json(user);
+  const cookieOpts = { path: "/", httpOnly: false, sameSite: "lax" as const, maxAge: 86400 };
+  res.cookies.set("AXI-USER-DEPT", encodeURIComponent(user.deptName || ""), cookieOpts);
+  return res;
 }

@@ -63,6 +63,8 @@ export default function Sidebar() {
         }
       })
       .catch(() => {});
+    // 부서 쿠키 갱신 (기존 세션 포함)
+    fetch(`${BASE}/api/auth/me`).catch(() => {});
   }, []);
 
   const handleLogout = async () => {
