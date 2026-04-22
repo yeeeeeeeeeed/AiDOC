@@ -60,6 +60,7 @@ export default function ComparePage() {
   const [uploadA, setUploadA] = useState<UploadResult | null>(null);
   const [uploadB, setUploadB] = useState<UploadResult | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
+  const [activePreset, setActivePreset] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ComparePageResult[]>([]);
@@ -152,12 +153,28 @@ export default function ComparePage() {
           <div
             style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}
           >
+            {/* 빠른 지시 칩 */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>빠른 지시</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {["변경 항목만 추출", "추가·삭제 구분 표시", "조항 번호 기준 정렬"].map((t) => {
+                  const active = activePreset === t;
+                  return (
+                    <button key={t} onClick={() => { setCustomPrompt(t); setActivePreset(t); }}
+                      style={{ padding: "6px 10px", borderRadius: 999, border: active ? "2px solid #3B5BFF" : "1px solid #EBE8E0", background: active ? "#EEF1FF" : "#FAFAF7", fontSize: 11.5, color: active ? "#2740C7" : "#4A5259", cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.12s, color 0.12s, background 0.12s" }}
+                      onMouseEnter={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#3B5BFF"; el.style.color = "#3B5BFF"; } }}
+                      onMouseLeave={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#EBE8E0"; el.style.color = "#4A5259"; } }}
+                    >{t}</button>
+                  );
+                })}
+              </div>
+            </div>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>추가 지시 (선택)</div>
             <textarea
               className="textarea"
               placeholder="예: 단가 변경만 비교, 조항 변경 위주로 분석..."
               value={customPrompt}
-              onChange={(e) => setCustomPrompt(e.target.value)}
+              onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
               style={{ fontSize: 13 }}
             />
           </div>

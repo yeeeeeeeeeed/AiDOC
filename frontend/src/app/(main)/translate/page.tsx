@@ -88,6 +88,7 @@ function TranslateInner() {
   const [sourceLang, setSourceLang] = useState("auto");
   const [targetLang, setTargetLang] = useState("ko");
   const [customPrompt, setCustomPrompt] = useState("");
+  const [activePreset, setActivePreset] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [steps, setSteps] = useState<StepStatus[]>([]);
@@ -290,12 +291,28 @@ function TranslateInner() {
                     </select>
                   </div>
                 </div>
+                {/* 빠른 지시 칩 */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>빠른 지시</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {["기술 용어 영문 병기", "경어체 유지", "단락 구조 그대로"].map((t) => {
+                      const active = activePreset === t;
+                      return (
+                        <button key={t} onClick={() => { setCustomPrompt(t); setActivePreset(t); }}
+                          style={{ padding: "6px 10px", borderRadius: 999, border: active ? "2px solid #3B5BFF" : "1px solid #EBE8E0", background: active ? "#EEF1FF" : "#FAFAF7", fontSize: 11.5, color: active ? "#2740C7" : "#4A5259", cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.12s, color 0.12s, background 0.12s" }}
+                          onMouseEnter={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#3B5BFF"; el.style.color = "#3B5BFF"; } }}
+                          onMouseLeave={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#EBE8E0"; el.style.color = "#4A5259"; } }}
+                        >{t}</button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>추가 지시 (선택)</div>
                 <textarea
                   className="textarea"
                   placeholder="예: 기술 용어는 영문 병기, 표는 원문 유지..."
                   value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
                   style={{ fontSize: 13 }}
                 />
               </div>
