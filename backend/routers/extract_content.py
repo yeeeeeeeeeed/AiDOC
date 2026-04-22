@@ -47,6 +47,10 @@ def start_content_extract(req: ContentExtractRequest, background_tasks: Backgrou
     user_name = request.cookies.get("AXI-USER-NAME", "")
     filename = j.get("filename", "")
 
+    from routers.limits import check_user_limit
+    if msg := check_user_limit(user_id):
+        raise HTTPException(429, msg)
+
     from routers.history import log_action
     log_action("내용추출", "start", f"{filename}, {len(pages)}페이지", request)
 

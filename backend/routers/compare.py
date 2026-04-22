@@ -5,7 +5,7 @@ import asyncio
 import json
 import logging
 from typing import Optional
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -54,7 +54,13 @@ _compare_jobs: dict = {}
 
 
 @router.post("/start")
-def start_compare(req: CompareRequest, background_tasks: BackgroundTasks):
+def start_compare(req: CompareRequest, background_tasks: BackgroundTasks, request: Request):
+    user_id = request.cookies.get("AXI-USER-ID", "")
+
+    from routers.limits import check_user_limit
+    if msg := check_user_limit(user_id):
+        raise HTTPException(429, msg)
+
     ja = _jobs.get(req.job_id_a)
     jb = _jobs.get(req.job_id_b)
     if not ja or not jb:

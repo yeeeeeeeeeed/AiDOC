@@ -91,6 +91,52 @@ def _compute_status(used: int, limit: int, manually_blocked: bool, auto_block: b
     return "ok"
 
 
+# ── 한도 집행 ────────────────────────────────────────────────────────────────
+
+def check_user_limit(user_id: str) -> str | None:
+    """AI 작업 시작 전 한도 체크. 차단/초과 시 오류 메시지 반환, 정상 시 None."""
+    if not user_id:
+        return None
+
+    now        = datetime.now()
+    month_from = now.strftime("%Y-%m-01")
+    month_to   = now.strftime("%Y-%m-%d")
+    today_str  = now.strftime("%Y-%m-%d")
+
+    with _LOCK:
+        ldata = _read_limits()
+
+    default_limit       = ldata["default_limit"]
+    default_daily_limit = ldata["default_daily_limit"]
+    cfg         = ldata["users"].get(user_id, {})
+    limit       = cfg.get("limit", default_limit)
+    daily_limit = cfg.get("daily_limit") or default_daily_limit
+    auto_block  = cfg.get("auto_block", False)
+    man_blocked = cfg.get("blocked", False)
+
+    if man_blocked:
+        return "관리자에 의해 차단된 계정입니다. 관리자에게 문의하세요."
+
+    entries = _read_token_logs(month_from, month_to)
+    monthly = 0
+    today   = 0
+    for e in entries:
+        if e.get("user_id") != user_id:
+            continue
+        tokens  = e.get("input_tokens", 0) + e.get("output_tokens", 0)
+        monthly += tokens
+        if e.get("timestamp", "")[:10] == today_str:
+            today += tokens
+
+    if auto_block and limit > 0 and monthly >= limit:
+        return f"이번 달 토큰 한도({monthly:,} / {limit:,})를 초과했습니다. 관리자에게 문의하세요."
+
+    if daily_limit > 0 and today >= daily_limit:
+        return f"오늘 사용 한도({today:,} / {daily_limit:,})를 초과했습니다. 내일 다시 이용해주세요."
+
+    return None
+
+
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
 
 @router.get("/limits")

@@ -58,6 +58,10 @@ def start_translate(req: TranslateRequest, background_tasks: BackgroundTasks, re
     filename = j.get("filename", "")
     target_name = LANG_NAMES.get(req.target_lang, req.target_lang)
 
+    from routers.limits import check_user_limit
+    if msg := check_user_limit(user_id):
+        raise HTTPException(429, msg)
+
     from routers.history import log_action
     log_action("번역", "start", f"{filename}, {len(pages)}페이지 → {target_name}", request)
 
