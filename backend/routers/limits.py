@@ -131,9 +131,6 @@ def check_user_limit(user_id: str) -> str | None:
     if auto_block and limit > 0 and monthly >= limit:
         return f"이번 달 토큰 한도({monthly:,} / {limit:,})를 초과했습니다. 관리자에게 문의하세요."
 
-    if daily_limit > 0 and today >= daily_limit:
-        return f"오늘 사용 한도({today:,} / {daily_limit:,})를 초과했습니다. 내일 다시 이용해주세요."
-
     return None
 
 
