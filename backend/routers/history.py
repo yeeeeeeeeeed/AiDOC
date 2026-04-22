@@ -211,8 +211,17 @@ def get_history(
     if user_id:
         all_actions = [a for a in all_actions if a.get("user_id") == user_id]
     if user_name:
-        kw = user_name.lower()
-        all_actions = [a for a in all_actions if kw in a.get("user_name", "").lower()]
+        from urllib.parse import unquote
+        kw = user_name.strip().lower()
+        def _decoded(name: str) -> str:
+            v = name
+            for _ in range(5):
+                d = unquote(v)
+                if d == v:
+                    break
+                v = d
+            return v.lower()
+        all_actions = [a for a in all_actions if kw in _decoded(a.get("user_name", ""))]
     if action_type:
         all_actions = [a for a in all_actions if a.get("action") == action_type]
 
