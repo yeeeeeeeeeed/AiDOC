@@ -68,7 +68,7 @@ export default function PdfUploader({ onUploaded, multiple = false }: Props) {
                 : new Error("DRM 복호화에 실패했습니다. AiDoc에 다시 로그인한 후 업로드해 주세요.");
             }
             // 일반 PDF면 직접 업로드 진행 (DRM 프록시 오류 무시)
-            void drmErr;
+            console.error("[PdfUploader] DRM proxy error (ignored for plain PDF):", drmErr);
           }
 
           const fd = new FormData();

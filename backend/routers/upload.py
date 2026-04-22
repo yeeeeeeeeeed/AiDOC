@@ -1,6 +1,7 @@
 """PDF 업로드 → 페이지별 이미지 변환"""
 
 import os
+import re
 import json
 import base64
 import logging
@@ -85,6 +86,12 @@ async def upload_pdf(request: Request):
     job_id = datetime.now().strftime("%Y%m%d%H%M%S") + "_" + os.urandom(3).hex()
     job_dir = os.path.join(TMP_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
+
+    # 경로 조작 방지: 파일명에서 디렉토리 구성 요소 및 위험 문자 제거
+    filename = os.path.basename(filename)
+    filename = re.sub(r'[^\w\-_\. ]', '_', filename)
+    if not filename or filename.startswith('.'):
+        filename = "upload.pdf"
 
     # PDF 저장
     pdf_path = os.path.join(job_dir, filename)

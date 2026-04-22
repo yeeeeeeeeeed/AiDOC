@@ -13,7 +13,7 @@ function decodeName(name?: string): string {
   if (!name) return "";
   let v = name;
   for (let i = 0; i < 5; i++) {
-    try { const d = decodeURIComponent(v); if (d === v) break; v = d; } catch { break; }
+    try { const d = decodeURIComponent(v); if (d === v) break; v = d; } catch (_e) { break; }
   }
   return v;
 }
@@ -69,7 +69,7 @@ function AdminManager() {
       const res = await fetch(`${BACKEND}/api/admin/users`, { credentials: "include" });
       const data = await res.json();
       setAdmins(data.admins || []);
-    } catch {} finally { setLoading(false); }
+    } catch (err) { console.error("[history] fetch error:", err); } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -183,7 +183,7 @@ function VisitorsTab() {
     setLoading(true);
     try {
       setVisitorData(await api.get<VisitorSummary>(`/api/admin/visitors?date_from=${dateFrom}&date_to=${dateTo}`));
-    } catch {} finally { setLoading(false); }
+    } catch (err) { console.error("[history] fetch error:", err); } finally { setLoading(false); }
   }, [dateFrom, dateTo]);
 
   useEffect(() => { fetchVisitors(); }, []);
@@ -372,7 +372,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     fetch(`${BACKEND}/api/admin/check`, { credentials: "include" })
-      .then((r) => r.json()).then(setAccess).catch(() => {});
+      .then((r) => r.json()).then(setAccess).catch((err) => { console.error("[history] fetch error:", err); });
   }, []);
 
   const fetchHistory = useCallback(async () => {
@@ -383,7 +383,7 @@ export default function HistoryPage() {
       if (filterName) params.set("user_name", filterName);
       const res = await api.get<{ items: HistoryItem[]; total: number }>(`/api/admin/history?${params}`);
       setItems(res.items); setTotal(res.total);
-    } catch {} finally { setLoading(false); }
+    } catch (err) { console.error("[history] fetch error:", err); } finally { setLoading(false); }
   }, [dateFrom, dateTo, page, filterUser, filterName]);
 
   useEffect(() => { if (access?.is_admin && activeTab === "history") fetchHistory(); }, [access, activeTab, page]);
