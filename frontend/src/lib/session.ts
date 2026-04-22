@@ -1,16 +1,19 @@
 /**
  * 페이지 새로고침 후에도 업로드 상태를 유지하는 유틸리티
- * - job 메타데이터 (job_id, filename, page_count) → localStorage (24h TTL)
- * - 썸네일 (base64 배열) → sessionStorage (탭 닫으면 삭제, 새로고침은 유지)
+ * - job 메타데이터 (job_id, filename, page_count) → localStorage (당일만 유지)
+ * - 결과 데이터 → localStorage (당일만 유지)
+ * - 썸네일 (base64 배열) → sessionStorage (탭 닫으면 삭제)
  */
 
-const TTL_MS = 24 * 60 * 60 * 1000;
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 interface SessionData {
   job_id: string;
   filename: string;
   page_count: number;
-  saved_at: number;
+  saved_date: string;
 }
 
 export function saveSession(
@@ -18,7 +21,7 @@ export function saveSession(
   data: { job_id: string; filename: string; page_count: number }
 ) {
   try {
-    const entry: SessionData = { ...data, saved_at: Date.now() };
+    const entry: SessionData = { ...data, saved_date: todayStr() };
     localStorage.setItem(`aidoc_${key}`, JSON.stringify(entry));
   } catch {}
 }
@@ -30,7 +33,7 @@ export function loadSession(
     const raw = localStorage.getItem(`aidoc_${key}`);
     if (!raw) return null;
     const entry: SessionData = JSON.parse(raw);
-    if (Date.now() - entry.saved_at > TTL_MS) {
+    if ((entry as SessionData).saved_date !== todayStr()) {
       localStorage.removeItem(`aidoc_${key}`);
       return null;
     }
@@ -43,21 +46,27 @@ export function loadSession(
 export function clearSession(key: string) {
   try {
     localStorage.removeItem(`aidoc_${key}`);
+    localStorage.removeItem(`aidoc_result_${key}`);
     sessionStorage.removeItem(`aidoc_thumbs_${key}`);
-    sessionStorage.removeItem(`aidoc_result_${key}`);
   } catch {}
 }
 
 export function saveResult(key: string, data: unknown) {
   try {
-    sessionStorage.setItem(`aidoc_result_${key}`, JSON.stringify(data));
+    localStorage.setItem(`aidoc_result_${key}`, JSON.stringify({ data, saved_date: todayStr() }));
   } catch {}
 }
 
 export function loadResult<T>(key: string): T | null {
   try {
-    const raw = sessionStorage.getItem(`aidoc_result_${key}`);
-    return raw ? (JSON.parse(raw) as T) : null;
+    const raw = localStorage.getItem(`aidoc_result_${key}`);
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (entry.saved_date !== todayStr()) {
+      localStorage.removeItem(`aidoc_result_${key}`);
+      return null;
+    }
+    return entry.data as T;
   } catch {
     return null;
   }
