@@ -78,6 +78,19 @@ export default function HomePage() {
   const [recentJobs, setRecentJobs] = useState<RecentJob[] | null>(null);
   const [stats, setStats] = useState<MyStats | null>(null);
   const [loadingData, setLoadingData] = useState(true);
+  const [userName, setUserName] = useState("");
+
+  useEffect(() => {
+    const raw = document.cookie.split(";").map((c) => c.trim()).find((c) => c.startsWith("AXI-USER-NAME="));
+    if (raw) {
+      try {
+        const val = raw.slice("AXI-USER-NAME=".length);
+        setUserName(decodeURIComponent(decodeURIComponent(val)));
+      } catch {
+        setUserName(decodeURIComponent(raw.slice("AXI-USER-NAME=".length)));
+      }
+    }
+  }, []);
 
   useEffect(() => {
     setLoadingData(true);
@@ -216,7 +229,7 @@ export default function HomePage() {
             Welcome Back
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 600, letterSpacing: -0.6, margin: 0, lineHeight: 1.25 }}>
-            안녕하세요.{" "}
+            안녕하세요{userName ? `, ${userName}님` : ""}.{" "}
             <span style={{ color: "#8A9199", fontWeight: 400 }}>오늘은 어떤 문서를 다뤄볼까요?</span>
           </h1>
         </div>
