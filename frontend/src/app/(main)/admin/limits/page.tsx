@@ -270,7 +270,7 @@ export default function LimitsPage() {
               <div style={{ fontSize: 28, marginBottom: 10 }}>📋</div>
               <div style={{ fontSize: 14, fontWeight: 500, color: "#0F1419", marginBottom: 6 }}>아직 설정된 한도가 없습니다</div>
               <div style={{ fontSize: 13, color: "#8A9199" }}>
-                기본 한도: {fmtNum(defaultLimit)} 토큰 / 월 · {fmtNum(defaultDaily)} 토큰 / 일
+                기본 월 한도: {fmtNum(defaultLimit)} 토큰
               </div>
             </div>
           )}
