@@ -135,7 +135,7 @@ function ContentExtractInner() {
               background: "#fff",
               border: "1px solid #EBE8E0",
               borderRadius: 14,
-              padding: "14px 20px",
+              padding: "16px 20px",
               marginBottom: 16,
               display: "flex",
               alignItems: "center",
@@ -145,7 +145,7 @@ function ContentExtractInner() {
             <div className="pdf-icon">PDF</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 500 }}>{upload.filename}</div>
-              <div style={{ fontSize: 11.5, color: "#8A9199", marginTop: 2 }}>{upload.page_count}페이지</div>
+              <div style={{ fontSize: 12, color: "#8A9199", marginTop: 2 }}>{upload.page_count}페이지</div>
             </div>
             <button
               className="btn btn-secondary btn-sm"
@@ -172,43 +172,60 @@ function ContentExtractInner() {
           )}
 
           {!hasResult && (
-            <>
-              <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                {/* 빠른 지시 칩 */}
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 6 }}>빠른 지시</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {["제목·소제목 구조 유지", "표·수식 텍스트 변환", "각주·참고문헌 포함"].map((t) => {
-                      const active = activePreset === t;
-                      return (
-                        <button key={t} onClick={() => { setCustomPrompt(t); setActivePreset(t); }}
-                          style={{ padding: "6px 10px", borderRadius: 999, border: active ? "2px solid #3B5BFF" : "1px solid #EBE8E0", background: active ? "#EEF1FF" : "#FAFAF7", fontSize: 11.5, color: active ? "#2740C7" : "#4A5259", cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.12s, color 0.12s, background 0.12s" }}
-                          onMouseEnter={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#3B5BFF"; el.style.color = "#3B5BFF"; } }}
-                          onMouseLeave={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#EBE8E0"; el.style.color = "#4A5259"; } }}
-                        >{t}</button>
-                      );
-                    })}
-                  </div>
+            <div style={{ background: "#fff", border: "1px solid #EBE8E0", borderRadius: 14, padding: 24, marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 18 }}>추출 옵션</div>
+
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>빠른 지시</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {["제목·소제목 구조 유지", "표·수식 텍스트 변환", "각주·참고문헌 포함"].map((t) => {
+                    const active = activePreset === t;
+                    return (
+                      <button key={t} onClick={() => { setCustomPrompt(t); setActivePreset(t); }}
+                        style={{ padding: "6px 10px", borderRadius: 999, border: active ? "2px solid #3B5BFF" : "1px solid #EBE8E0", background: active ? "#EEF1FF" : "#FAFAF7", fontSize: 11.5, color: active ? "#2740C7" : "#4A5259", cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.12s, color 0.12s, background 0.12s" }}
+                        onMouseEnter={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#3B5BFF"; el.style.color = "#3B5BFF"; } }}
+                        onMouseLeave={(e) => { if (!active) { const el = e.currentTarget; el.style.borderColor = "#EBE8E0"; el.style.color = "#4A5259"; } }}
+                      >{t}</button>
+                    );
+                  })}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>추가 지시 (선택)</div>
-                <textarea
-                  className="textarea"
-                  placeholder="예: 제목과 본문만 추출해줘, 수식은 LaTeX로 표현해줘..."
-                  value={customPrompt}
-                  onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
-                  style={{ fontSize: 13 }}
-                />
               </div>
 
-              <button
-                className="btn btn-accent btn-block"
-                style={{ marginBottom: 16 }}
-                onClick={startExtract}
-                disabled={processing || selectedPages.length === 0}
-              >
-                {processing ? "추출 중..." : `내용 추출 시작 (${selectedPages.length}페이지)`}
-              </button>
-            </>
+              <div style={{ fontSize: 12, color: "#8A9199", marginBottom: 8 }}>추가 지시 (선택)</div>
+              <textarea
+                className="textarea"
+                placeholder="예: 제목과 본문만 추출해줘, 수식은 LaTeX로 표현해줘..."
+                value={customPrompt}
+                onChange={(e) => { setCustomPrompt(e.target.value); setActivePreset(""); }}
+                style={{ minHeight: 80, fontSize: 12.5 }}
+              />
+
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+                <button
+                  onClick={startExtract}
+                  disabled={processing || selectedPages.length === 0}
+                  style={{
+                    padding: "10px 24px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: (processing || selectedPages.length === 0) ? "#EBE8E0" : "#3B5BFF",
+                    color: (processing || selectedPages.length === 0) ? "#8A9199" : "#fff",
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    cursor: (processing || selectedPages.length === 0) ? "not-allowed" : "pointer",
+                    fontFamily: "inherit",
+                    transition: "background 0.12s, color 0.12s",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {processing
+                    ? "추출 중..."
+                    : selectedPages.length === 0
+                    ? "페이지를 선택하세요"
+                    : `내용 추출 시작 · ${selectedPages.length}페이지`}
+                </button>
+              </div>
+            </div>
           )}
         </>
       )}
