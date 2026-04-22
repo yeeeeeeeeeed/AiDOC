@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
   res.cookies.set("AXI-TCM-TOKEN", tcmToken, { ...cookieOpts, maxAge: 15552000 });
   res.cookies.set("AXI-USER-NAME", encodeURIComponent(user.englishName || user.loginId), cookieOpts);
   res.cookies.set("AXI-USER-ID", user.empId, cookieOpts);
+  res.cookies.set("AXI-USER-DEPT", encodeURIComponent(user.deptName || ""), cookieOpts);
   res.cookies.delete("AXI-RETURN-TO");
 
   return res;

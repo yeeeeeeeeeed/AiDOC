@@ -48,7 +48,7 @@ def start_content_extract(req: ContentExtractRequest, background_tasks: Backgrou
     filename = j.get("filename", "")
 
     from routers.limits import check_user_limit
-    if msg := check_user_limit(user_id):
+    if msg := check_user_limit(user_id, request.cookies.get("AXI-USER-DEPT", "")):
         raise HTTPException(429, msg)
 
     from routers.history import log_action

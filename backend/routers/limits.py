@@ -91,7 +91,7 @@ def _compute_status(used: int, limit: int, manually_blocked: bool, auto_block: b
 
 # ── 한도 집행 ────────────────────────────────────────────────────────────────
 
-def check_user_limit(user_id: str) -> str | None:
+def check_user_limit(user_id: str, user_dept: str = "") -> str | None:
     """AI 작업 시작 전 한도 체크. 차단/초과 시 오류 메시지 반환, 정상 시 None."""
     if not user_id:
         return None
@@ -99,15 +99,23 @@ def check_user_limit(user_id: str) -> str | None:
     now        = datetime.now()
     month_from = now.strftime("%Y-%m-01")
     month_to   = now.strftime("%Y-%m-%d")
-    today_str  = now.strftime("%Y-%m-%d")
 
     with _LOCK:
         ldata = _read_limits()
+        cfg   = ldata["users"].setdefault(user_id, {})
+        if user_dept and not cfg.get("dept"):
+            from urllib.parse import unquote
+            v = user_dept
+            for _ in range(5):
+                d = unquote(v);
+                if d == v: break
+                v = d
+            cfg["dept"] = v
+            _write_limits(ldata)
 
     default_limit = ldata["default_limit"]
-    cfg           = ldata["users"].get(user_id, {})
     limit         = cfg.get("limit", default_limit)
-    auto_block    = cfg.get("auto_block", False)
+    auto_block    = cfg.get("auto_block", True)
     man_blocked   = cfg.get("blocked", False)
 
     if man_blocked:
@@ -169,7 +177,7 @@ def get_limits(request: Request):
     for uid in sorted(all_uids):
         cfg         = users_cfg.get(uid, {})
         limit       = cfg.get("limit", default_limit)
-        auto_block  = cfg.get("auto_block", False)
+        auto_block  = cfg.get("auto_block", True)
         man_blocked = cfg.get("blocked", False)
         used        = monthly_usage.get(uid, 0)
 

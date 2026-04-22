@@ -58,7 +58,7 @@ def start_compare(req: CompareRequest, background_tasks: BackgroundTasks, reques
     user_id = request.cookies.get("AXI-USER-ID", "")
 
     from routers.limits import check_user_limit
-    if msg := check_user_limit(user_id):
+    if msg := check_user_limit(user_id, request.cookies.get("AXI-USER-DEPT", "")):
         raise HTTPException(429, msg)
 
     ja = _jobs.get(req.job_id_a)
