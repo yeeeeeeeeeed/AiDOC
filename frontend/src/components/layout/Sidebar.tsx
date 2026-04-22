@@ -36,7 +36,6 @@ const MENU: MenuItem[] = [
     children: [
       { label: "이용 기록",  href: "/admin/history"  },
       { label: "토큰 사용량", href: "/admin/tokens"   },
-      { label: "방문자 로그", href: "/admin/visitors" },
       { label: "사용 한도",  href: "/admin/limits"   },
     ],
   },
